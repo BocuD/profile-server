@@ -27,23 +27,26 @@ if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
     return;
 }
 
-SteamCMD steamCmd = new(username, password);
+SteamCMDController steamCmdController = new(username, password);
 
-if (!steamCmd.installed)
+string? gameId = Environment.GetEnvironmentVariable("STEAMGAMEID");
+string? betaBranch = Environment.GetEnvironmentVariable("STEAMBETABRANCH");
+
+if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(betaBranch))
 {
-    await steamCmd.RunInitialInstallation();
+    Log.Error("Steam game ID or beta branch not set in environment!");
+    return;
 }
 
-string gameId = "3365820";
-string betaBranch = "jenkins";
+//handle getting the latest game version and updating it
+await steamCmdController.RunCommand("force_install_dir ./game");
+await steamCmdController.RunCommand($"app_update {gameId} -beta {betaBranch} validate");
+await steamCmdController.RunCommand("quit");
 
-await steamCmd.RunCommand($"app_update {gameId} -beta {betaBranch}");
-
+//start the web server
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSerilog();
 
 var app = builder.Build();
-
-app.MapGet("/", () => "Hello World!");
 
 app.Run();
