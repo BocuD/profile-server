@@ -6,8 +6,16 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateLogger();
 
+Log.Information("Starting ProfileServer...");
+
 //read .env
 string path = Path.Combine(Environment.CurrentDirectory, ".env");
+
+if (!File.Exists(path))
+{
+    Log.Error("No .env file found!");
+    return;
+}
 
 foreach (string line in File.ReadAllLines(path))
 {
