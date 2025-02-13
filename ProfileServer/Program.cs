@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ProfileServer;
 using Serilog;
 
@@ -50,6 +51,21 @@ if (string.IsNullOrEmpty(gameId) || string.IsNullOrEmpty(betaBranch))
 await steamCmdController.RunCommand("force_install_dir ./game");
 await steamCmdController.RunCommand($"app_update {gameId} -beta {betaBranch} validate");
 await steamCmdController.RunCommand("quit");
+
+//start game process
+Process gameProcess = new Process
+{
+    StartInfo = new ProcessStartInfo
+    {
+        FileName = Environment.CurrentDirectory + "/steamcmd/game/" + "Team1GardenProject.exe",
+        WorkingDirectory = Environment.CurrentDirectory + "/steamcmd/game",
+        UseShellExecute = false
+    }
+};
+
+gameProcess.Start();
+
+await gameProcess.WaitForExitAsync();
 
 //start the web server
 var builder = WebApplication.CreateBuilder(args);
