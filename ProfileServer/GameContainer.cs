@@ -4,23 +4,18 @@ using Serilog;
 
 namespace ProfileServer;
 
-public class GameContainer
+public class GameContainer(string workingDirectory, string executable)
 {
-    public GameContainer(string workingDirectory, string executable)
+    //start game process
+    private readonly Process gameProcess = new()
     {
-        //start game process
-        gameProcess = new Process
+        StartInfo = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = workingDirectory + executable,
-                WorkingDirectory = workingDirectory,
-                UseShellExecute = false
-            }
-        };
-    }
-
-    private readonly Process gameProcess;
+            FileName = workingDirectory + executable,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false
+        }
+    };
     private DateTime startTime;
     public bool isRunning => !gameProcess.HasExited;
 
