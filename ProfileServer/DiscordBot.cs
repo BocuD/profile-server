@@ -106,32 +106,7 @@ public class DiscordBot
             {
                 if (commands.TryGetValue(command.Data.Name, out Func<ulong, Task>? action))
                 {
-                    RestInteractionMessage message = null;
-                    try
-                    {
-                        //send a response to indicate the command is being executed
-                        await command.RespondAsync($">{command.Data.Name} - Executing command...\n");
-                        message = await command.GetOriginalResponseAsync();
-
-                        messageContent.Add(message.Id, message.Content);
-
-                        await action.Invoke(message.Id);
-                        
-                        await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command executed successfully.");
-                    }
-                    catch (Exception e)
-                    {
-                        if (message == null)
-                        {
-                            //send the error message to discord
-                            await command.RespondAsync($"An error occurred while executing command `{command.Data.Name}`: " + e.Message);
-                        }
-                        else
-                        {
-                            await message.ModifyAsync(x =>
-                                x.Content = $"{x.Content}\n>An error occurred while executing command `{command.Data.Name}`: " + e.Message);
-                        }
-                    }
+                    _ = Task.Run(async () => await ExecuteCommand(command, action));
                 }
             }
         };
@@ -160,6 +135,38 @@ public class DiscordBot
             await interaction.RespondAsync("Steam Guard code received. Submitting...");
         };
     }
+
+    private async Task ExecuteCommand(SocketSlashCommand command, Func<ulong, Task> action)
+    {
+        RestInteractionMessage message = null;
+        try
+        {
+            //send a response to indicate the command is being executed
+            await command.RespondAsync($">{command.Data.Name} - Executing command...\n");
+            message = await command.GetOriginalResponseAsync();
+
+            messageContent.Add(message.Id, message.Content);
+
+            await action.Invoke(message.Id);
+                        
+            await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command executed successfully.");
+        }
+        catch (Exception e)
+        {
+            if (message == null)
+            {
+                //send the error message to discord
+                await command.RespondAsync($"An error occurred while executing command `{command.Data.Name}`: " + e.Message);
+            }
+            else
+            {
+                await message.ModifyAsync(x =>
+                    x.Content = $"{x.Content}\n>An error occurred while executing command `{command.Data.Name}`: " + e.Message);
+            }
+        }
+    }
+
+    private void VerifyUnrealInsights()
     {
         //check if a process is running with the name UnrealInsights.exe
         if (Process.GetProcessesByName("UnrealInsights").Length == 0)
