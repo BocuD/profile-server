@@ -55,15 +55,8 @@ public class SteamCMDController
                     {
                         currentCommandLog += "[steamcmd] " + line + "\n";
                         
-                        //ensure only 20 lines remain at any time
-                        string[] lines = currentCommandLog.Split('\n');
-                        if (lines.Length > 20)
-                        {
-                            currentCommandLog = string.Join('\n', lines[^20..]);
-                        }
-                        
                         //filter out the styling stuff only intended for the console
-                        await DiscordBot.Instance.UpdateMessageContent(statusMessage, currentCommandLog);
+                        await DiscordBot.Instance.UpdateMessageContent(statusMessage, "[steamcmd] " + line.Replace("\n", ""));
                     }
                     
                     //we need 2FA

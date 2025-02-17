@@ -1,4 +1,5 @@
-﻿using Discord;
+﻿using System.Diagnostics;
+using Discord;
 using Discord.Net;
 using Discord.Rest;
 using Discord.WebSocket;
@@ -25,7 +26,7 @@ public class DiscordBot
 
     private readonly DiscordSocketClient client;    
     private readonly SteamCMDController steamCmdController;
-    private readonly GameContainer gameContainer;
+    private GameContainer gameContainer;
     
     private readonly string gameId = Environment.GetEnvironmentVariable("STEAMGAMEID") ?? 
                                      throw new ArgumentNullException("STEAMGAMEID environment variable not set.");
@@ -36,6 +37,9 @@ public class DiscordBot
     private readonly string gameExecutable = Environment.GetEnvironmentVariable("GAMEBINARY") ?? 
                                               throw new ArgumentNullException("GAMEBINARY environment variable not set.");
     
+    private readonly string unrealInsightsPath = Environment.GetEnvironmentVariable("UNREALINSIGHTSPATH") ??
+                                throw new ArgumentNullException("UNREALINSIGHTSPATH environment variable not set.");
+
     public DiscordBot()
     {
         Instance = this;
@@ -54,7 +58,6 @@ public class DiscordBot
 
         //start steamcmd
         steamCmdController = new SteamCMDController(username, password);
-        gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable);
     }
 
     private SocketGuild? guild;
@@ -76,6 +79,8 @@ public class DiscordBot
         client.Ready += async () =>
         {
             await VerifyGuild();
+
+            await VerifyUnrealInsights();
             
             await CreateGuildCommand("update-game", "Update the game to the latest version", async m =>
             {
@@ -106,12 +111,14 @@ public class DiscordBot
                     try
                     {
                         //send a response to indicate the command is being executed
-                        await command.RespondAsync($">{command.Data.Name} - Executing command...");
+                        await command.RespondAsync($">{command.Data.Name} - Executing command...\n");
                         message = await command.GetOriginalResponseAsync();
+
+                        messageContent.Add(message.Id, message.Content);
 
                         await action.Invoke(message.Id);
                         
-                        await UpdateMessageContent(message.Id, $"{message.Content}\n>{command.Data.Name} - Command executed successfully.");
+                        await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command executed successfully.");
                     }
                     catch (Exception e)
                     {
@@ -155,6 +162,33 @@ public class DiscordBot
         };
     }
     
+    private async Task VerifyUnrealInsights()
+    {
+        //check if a process is running with the name UnrealInsights.exe
+        if (Process.GetProcessesByName("UnrealInsights").Length == 0)
+        {
+            Log.Information("UnrealInsights not running. Starting...");
+            
+            //check if the file exists
+            if (!File.Exists(unrealInsightsPath))
+            {
+                throw new FileNotFoundException("UnrealInsights executable not found at: " + unrealInsightsPath);
+            }
+            
+            //start the process
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = unrealInsightsPath
+            };
+            
+            Process.Start(startInfo);
+        }
+        else
+        {
+            Log.Information("UnrealInsights is already running.");
+        }
+    }
+
     private async Task VerifyGuild()
     {
         guild = client.GetGuild(guildId);
@@ -250,14 +284,25 @@ public class DiscordBot
         return twoFactorCodeResponse;
     }
 
+    SemaphoreSlim messageLock = new(1);
+    Dictionary<ulong, string> messageContent = new();
+    
     public async Task UpdateMessageContent(ulong statusMessage, string content)
     {
+        await messageLock.WaitAsync();
+        messageContent.TryGetValue(statusMessage, out string? currentContent);
+        
         var message = await channel.GetMessageAsync(statusMessage);
         
         //modify the message with the new content
         if (message is RestUserMessage restMessage)
         {
-            await restMessage.ModifyAsync(x => x.Content = content);
+            await restMessage.ModifyAsync(x => x.Content = currentContent + "\n" + content);
         }
+        
+        //update the dictionary
+        messageContent[statusMessage] = currentContent + "\n" + content;
+        
+        messageLock.Release();
     }
 }
