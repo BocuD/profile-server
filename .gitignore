@@ -398,3 +398,4 @@ FodyWeavers.xsd
 *.sln.iml
 ProfileServer/steamcmd/*
 ProfileServer/.env
+/ProfileServer/output
