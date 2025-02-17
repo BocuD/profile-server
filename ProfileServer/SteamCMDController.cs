@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using Discord.Rest;
 using Serilog;
 using SteamCMD.ConPTY;
 using SteamCMD.ConPTY.Interop.Definitions;
@@ -20,6 +22,8 @@ public class SteamCMDController
     private string username;
     private string password;
     
+    private static readonly Regex AnsiEscape = new(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
+    
     public SteamCMDController(string username, string password)
     {
         steamCmd = new SteamCMDConPTY
@@ -28,31 +32,46 @@ public class SteamCMDController
             WorkingDirectory = Environment.CurrentDirectory + "/steamcmd"
         };
         
-        steamCmd.OutputDataReceived += (sender, data) =>
+        steamCmd.OutputDataReceived += async (sender, data) =>
         {
             try
             {
+                //suspend process while processing data
                 SuspendProcess(processId);
                 
                 if (string.IsNullOrWhiteSpace(data)) return;
 
-                //suspend process while processing data
-                
                 //process each line individually
-                string[] lines = data.Split('\n');
-
-                foreach (string line in lines)
+                //remove all \r and ansi escape characters
+                string cleanLine = AnsiEscape.Replace(data, "").Replace("\r", "");
+                if (string.IsNullOrWhiteSpace(cleanLine)) return;
+                
+                string[] cleanedLines = cleanLine.Split('\n');
+                foreach (string line in cleanedLines) 
                 {
-                    //remove all \r and \n characters
-                    string cleanLine = line.Replace("\r", "").Replace("\n", "");
-                    if (string.IsNullOrWhiteSpace(cleanLine)) continue;
-                    Log.Information("[steamcmd] {line}", cleanLine);
+                    Log.Information("[steamcmd] {line}", line);
+
+                    if (statusMessage != 0)
+                    {
+                        currentCommandLog += "[steamcmd] " + line + "\n";
+                        
+                        //ensure only 20 lines remain at any time
+                        string[] lines = currentCommandLog.Split('\n');
+                        if (lines.Length > 20)
+                        {
+                            currentCommandLog = string.Join('\n', lines[^20..]);
+                        }
+                        
+                        //filter out the styling stuff only intended for the console
+                        await DiscordBot.Instance.UpdateMessageContent(statusMessage, currentCommandLog);
+                    }
                     
                     //we need 2FA
                     if (line.Contains("Two-factor code:"))
                     {
-                        string twoFactorCode = Console.ReadLine();
-                        steamCmd.WriteLine(twoFactorCode);
+                        string twoFactorCode = await DiscordBot.Instance.Get2FACode();
+                        Log.Information("2FA code received: {code}", twoFactorCode);
+                        await steamCmd.WriteLineAsync(twoFactorCode);
                     }
                     
                     if (line.Contains("Steam>")) lastCommandCompleted = true;
@@ -69,10 +88,8 @@ public class SteamCMDController
                     {
                         if (line.Contains("Two-factor code mismatch"))
                         {
-                            ResumeProcess(processId);
-                            
                             //retry login
-                            steamCmd.WriteLine($"login {username} {password}");
+                            await steamCmd.WriteLineAsync($"login {username} {password}");
                         }
                     }
 
@@ -103,6 +120,7 @@ public class SteamCMDController
         processId = info.dwProcessId;
     }
 
+    private string currentCommandLog;
     public async Task<bool> RunCommand(string command)
     {
         if (!running)
@@ -110,12 +128,25 @@ public class SteamCMDController
             return false;
         }
         
+        if (!lastCommandCompleted || !authenticated)
+        {
+            //send a message to indicate the last command is still running
+            await DiscordBot.Instance.SendMessage("[steamcmd] The last command is still running, please wait.");
+        }
+        
         while (!lastCommandCompleted || !authenticated)
         {
             await Task.Delay(100);
         }
 
+        lastCommandCompleted = false;
+        currentCommandLog = "";
         await steamCmd.WriteLineAsync(command);
+        
+        while (!lastCommandCompleted)
+        {
+            await Task.Delay(100);
+        }
         return true;
     }
     
@@ -187,5 +218,16 @@ public class SteamCMDController
 
             CloseHandle(pOpenThread);
         }
+    }
+
+    private ulong statusMessage;
+    public async Task UpdateGame(string gameId, string betaBranch, ulong message)
+    {
+        statusMessage = message;
+        
+        await RunCommand("force_install_dir ./game");
+        await RunCommand($"app_update {gameId} -beta {betaBranch} validate");
+
+        statusMessage = 0;
     }
 }
