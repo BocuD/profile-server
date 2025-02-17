@@ -84,7 +84,15 @@ public class DiscordBot
             
             await CreateGuildCommand("start-game", "Start the game instance", async m =>
             {
-                gameContainer.Start();
+                if (gameContainer is { isRunning: true })
+                {
+                    await UpdateMessageContent(m, "Game is already running.");
+                }
+                else
+                {
+                    gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable);
+                    await gameContainer.Run(m);
+                }
             });
         };
         
