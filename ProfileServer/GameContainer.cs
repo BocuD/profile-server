@@ -36,6 +36,14 @@ public class GameContainer(string workingDirectory, string executable)
             await GetTraceData(message);
         });
     }
+    
+    public void Stop()
+    {
+        if (gameProcess.HasExited) return;
+        
+        gameProcess.Kill();
+        Log.Information("Game force stopped");
+    }
 
     private async Task GetTraceData(ulong message)
     {

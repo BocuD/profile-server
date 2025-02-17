@@ -98,6 +98,21 @@ public class DiscordBot
                     await gameContainer.Run(m);
                 }
             });
+            
+            await CreateGuildCommand("stop-game", "Stop the running game instance", async m =>
+            {
+                if (gameContainer is { IsRunning: true })
+                {
+                    gameContainer.Stop();
+                    await UpdateMessageContent(m, "Game force stopped.");
+                }
+                else
+                {
+                    await UpdateMessageContent(m, "No game running.");
+                }
+            });
+            
+            await SendMessage("ProfileServer started and ready.");
         };
         
         client.InteractionCreated += async (interaction) =>
