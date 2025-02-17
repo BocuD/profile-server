@@ -60,8 +60,8 @@ public class DiscordBot
         steamCmdController = new SteamCMDController(username, password);
     }
 
-    private SocketGuild? guild;
-    private SocketTextChannel? channel;
+    private SocketGuild guild;
+    private SocketTextChannel channel;
     
     public async Task Init()
     {
@@ -78,18 +78,17 @@ public class DiscordBot
 
         client.Ready += async () =>
         {
-            await VerifyGuild();
-
-            await VerifyUnrealInsights();
+            VerifyGuild();
+            VerifyUnrealInsights();
             
             await CreateGuildCommand("update-game", "Update the game to the latest version", async m =>
             {
                 await steamCmdController.UpdateGame(gameId, betaBranch, m);
             });
             
-            await CreateGuildCommand("start-game", "Start the game instance", async m =>
+            await CreateGuildCommand("run-game", "Start a game instance and collect trace data", async m =>
             {
-                if (gameContainer is { isRunning: true })
+                if (gameContainer is { IsRunning: true })
                 {
                     await UpdateMessageContent(m, "Game is already running.");
                 }
@@ -161,8 +160,6 @@ public class DiscordBot
             await interaction.RespondAsync("Steam Guard code received. Submitting...");
         };
     }
-    
-    private async Task VerifyUnrealInsights()
     {
         //check if a process is running with the name UnrealInsights.exe
         if (Process.GetProcessesByName("UnrealInsights").Length == 0)
@@ -189,22 +186,30 @@ public class DiscordBot
         }
     }
 
-    private async Task VerifyGuild()
+    private void VerifyGuild()
     {
-        guild = client.GetGuild(guildId);
-        channel = client.GetGuild(guildId)?.GetTextChannel(channelId);
-        
-        if (guild == null)
+        SocketGuild? g = client.GetGuild(guildId);
+        SocketTextChannel? c = client.GetGuild(guildId)?.GetTextChannel(channelId);
+
+        if (g == null)
         {
             Log.Error("[Discord] Guild not found: {guildId}", guildId);
         }
-        
-        if (channel == null)
+        else
+        {
+            guild = g;
+        }
+
+        if (c == null)
         {
             Log.Error("[Discord] Channel not found: {channelId}", channelId);
         }
+        else
+        {
+            channel = c;
+        }
     }
-    
+
     private async Task CreateGuildCommand(string name, string description, Func<ulong, Task> action)
     {
         SlashCommandBuilder? command = new SlashCommandBuilder()
@@ -284,25 +289,31 @@ public class DiscordBot
         return twoFactorCodeResponse;
     }
 
-    SemaphoreSlim messageLock = new(1);
-    Dictionary<ulong, string> messageContent = new();
+    private readonly SemaphoreSlim messageLock = new(1);
+    private readonly Dictionary<ulong, string> messageContent = new();
     
     public async Task UpdateMessageContent(ulong statusMessage, string content)
     {
         await messageLock.WaitAsync();
         messageContent.TryGetValue(statusMessage, out string? currentContent);
         
-        var message = await channel.GetMessageAsync(statusMessage);
-        
+        IMessage? message = await channel.GetMessageAsync(statusMessage);
+
+        string newMessage = currentContent + "\n" + GetDiscordRelativeTimestamp(DateTime.UtcNow) + content;
         //modify the message with the new content
         if (message is RestUserMessage restMessage)
         {
-            await restMessage.ModifyAsync(x => x.Content = currentContent + "\n" + content);
+            await restMessage.ModifyAsync(x => x.Content = newMessage);
         }
         
         //update the dictionary
-        messageContent[statusMessage] = currentContent + "\n" + content;
+        messageContent[statusMessage] = newMessage;
         
         messageLock.Release();
+    }
+
+    private static string GetDiscordRelativeTimestamp(DateTime dateTime)
+    {
+        return $"<t:{(int) dateTime.Subtract(new DateTime(1970, 1, 1)).TotalSeconds}:T>";
     }
 }
