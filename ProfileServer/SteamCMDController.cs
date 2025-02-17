@@ -17,12 +17,9 @@ public class SteamCMDController
     private bool lastCommandCompleted = false;
     private string lastMessage = "";
     
-    private int processId = 0;
-
-    private string username;
-    private string password;
+    private readonly int processId = 0;
     
-    private static readonly Regex AnsiEscape = new(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
+    private static readonly Regex ansiEscape = new(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
     
     public SteamCMDController(string username, string password)
     {
@@ -43,7 +40,7 @@ public class SteamCMDController
 
                 //process each line individually
                 //remove all \r and ansi escape characters
-                string cleanLine = AnsiEscape.Replace(data, "").Replace("\r", "");
+                string cleanLine = ansiEscape.Replace(data, "").Replace("\r", "");
                 if (string.IsNullOrWhiteSpace(cleanLine)) return;
                 
                 string[] cleanedLines = cleanLine.Split('\n');
@@ -53,8 +50,6 @@ public class SteamCMDController
 
                     if (statusMessage != 0)
                     {
-                        currentCommandLog += "[steamcmd] " + line + "\n";
-                        
                         //filter out the styling stuff only intended for the console
                         await DiscordBot.Instance.UpdateMessageContent(statusMessage, "[steamcmd] " + line.Replace("\n", ""));
                     }
@@ -113,7 +108,6 @@ public class SteamCMDController
         processId = info.dwProcessId;
     }
 
-    private string currentCommandLog;
     public async Task<bool> RunCommand(string command)
     {
         if (!running)
@@ -133,7 +127,6 @@ public class SteamCMDController
         }
 
         lastCommandCompleted = false;
-        currentCommandLog = "";
         await steamCmd.WriteLineAsync(command);
         
         while (!lastCommandCompleted)
@@ -159,13 +152,13 @@ public class SteamCMDController
     }
 
     [DllImport("kernel32.dll")]
-    static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+    private static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
     [DllImport("kernel32.dll")]
-    static extern uint SuspendThread(IntPtr hThread);
+    private static extern uint SuspendThread(IntPtr hThread);
     [DllImport("kernel32.dll")]
-    static extern int ResumeThread(IntPtr hThread);
+    private static extern int ResumeThread(IntPtr hThread);
     [DllImport("kernel32", CharSet = CharSet.Auto,SetLastError = true)]
-    static extern bool CloseHandle(IntPtr handle);
+    private static extern bool CloseHandle(IntPtr handle);
 
 
     private static void SuspendProcess(int pid)
@@ -203,7 +196,7 @@ public class SteamCMDController
                 continue;
             }
 
-            var suspendCount = 0;
+            int suspendCount = 0;
             do
             {
                 suspendCount = ResumeThread(pOpenThread);

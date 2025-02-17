@@ -26,7 +26,7 @@ public class DiscordBot
 
     private readonly DiscordSocketClient client;    
     private readonly SteamCMDController steamCmdController;
-    private GameContainer gameContainer;
+    private GameContainer? gameContainer;
     
     private readonly string gameId = Environment.GetEnvironmentVariable("STEAMGAMEID") ?? 
                                      throw new ArgumentNullException("STEAMGAMEID environment variable not set.");
@@ -53,7 +53,7 @@ public class DiscordBot
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
             Log.Error("Steam username or password not set in environment!");
-            return;
+            throw new ArgumentNullException("Steam username or password not set in environment!");
         }
 
         //start steamcmd
@@ -115,7 +115,7 @@ public class DiscordBot
             await SendMessage("ProfileServer started and ready.");
         };
         
-        client.InteractionCreated += async (interaction) =>
+        client.InteractionCreated += (interaction) =>
         {
             if (interaction is SocketSlashCommand command)
             {
@@ -124,6 +124,8 @@ public class DiscordBot
                     _ = Task.Run(async () => await ExecuteCommand(command, action));
                 }
             }
+
+            return Task.CompletedTask;
         };
         
         client.ButtonExecuted += async (interaction) =>
@@ -153,7 +155,7 @@ public class DiscordBot
 
     private async Task ExecuteCommand(SocketSlashCommand command, Func<ulong, Task> action)
     {
-        RestInteractionMessage message = null;
+        RestInteractionMessage? message = null;
         try
         {
             //send a response to indicate the command is being executed
