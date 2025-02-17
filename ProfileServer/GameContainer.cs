@@ -17,12 +17,15 @@ public class GameContainer(string workingDirectory, string executable)
         }
     };
     private DateTime startTime;
-    public bool isRunning => !gameProcess.HasExited;
+    public bool IsRunning => !gameProcess.HasExited;
 
     public async Task Run(ulong message)
     {
         startTime = DateTime.Now;
-        await Task.Delay(1000);
+        
+        //adding a delay here to ensure the trace timestamp is after the game start
+        await Task.Delay(2000);
+        
         gameProcess.Start();
         
         await DiscordBot.Instance.UpdateMessageContent(message, "Game started");
@@ -33,6 +36,12 @@ public class GameContainer(string workingDirectory, string executable)
             await gameProcess.WaitForExitAsync();
             await DiscordBot.Instance.UpdateMessageContent(message, "Game exited with code " + gameProcess.ExitCode);
             Log.Information("Game exited with code {ExitCode}", gameProcess.ExitCode);
+
+            //give the game some time to finish writing the trace
+            await Task.Delay(3000);
+            
+            await DiscordBot.Instance.UpdateMessageContent(message, "Collecting trace data...");
+            Log.Information("Collecting trace data...");
             await GetTraceData(message);
         });
     }
@@ -67,13 +76,24 @@ public class GameContainer(string workingDirectory, string executable)
                     
                     //copy the trace to the output directory
                     string output = Path.Combine(Environment.CurrentDirectory, "output", Path.GetFileName(trace));
-                    File.Copy(trace, output);
+                    File.Move(trace, output);
 
                     await DiscordBot.Instance.UpdateMessageContent(message,
                         "Trace data collected: " + Path.GetFileName(trace));
-                    Log.Information("Trace data collected: {Trace}", Path.GetFileName(trace));
+                    
+                    long fileSize = new FileInfo(output).Length;
+                    
+                    Log.Information("Trace data collected: {Trace} ({fileSize})", Path.GetFileName(trace), PrettyBytes(fileSize));
                 }
             }
         }
+    }
+
+    private string PrettyBytes(long bytes)
+    {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+        if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024) + " MB";
+        return (bytes / 1024 / 1024 / 1024) + " GB";
     }
 }
