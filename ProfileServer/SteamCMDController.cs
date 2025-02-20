@@ -108,7 +108,7 @@ public class SteamCMDController
         processId = info.dwProcessId;
     }
 
-    public async Task<bool> RunCommand(string command)
+    public async Task<bool> RunCommand(string command, ulong message = 0)
     {
         if (!running)
         {
@@ -127,12 +127,15 @@ public class SteamCMDController
         }
 
         lastCommandCompleted = false;
+        statusMessage = message;
         await steamCmd.WriteLineAsync(command);
         
         while (!lastCommandCompleted)
         {
             await Task.Delay(100);
         }
+        
+        statusMessage = 0;
         return true;
     }
     
@@ -209,11 +212,7 @@ public class SteamCMDController
     private ulong statusMessage;
     public async Task UpdateGame(string gameId, string betaBranch, ulong message)
     {
-        statusMessage = message;
-        
-        await RunCommand("force_install_dir ./game");
-        await RunCommand($"app_update {gameId} -beta {betaBranch} validate");
-
-        statusMessage = 0;
+        await RunCommand("force_install_dir ./game", message);
+        await RunCommand($"app_update {gameId} -beta {betaBranch} validate", message);
     }
 }
