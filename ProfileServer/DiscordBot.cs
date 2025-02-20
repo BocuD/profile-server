@@ -117,17 +117,17 @@ public class DiscordBot
                 }
             });
             
-            await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
-            {
-                string? command = c.Data.Options.First(x => x.Name == "command").Value.ToString();
-                if (string.IsNullOrWhiteSpace(command))
-                {
-                    await UpdateMessageContent(m, "No command provided.");
-                    return false;
-                }
-                await steamCmdController.RunCommand(command);
-                return true;
-            }, new SlashCommandOptionBuilder().AddOption("command", ApplicationCommandOptionType.String, "The command to run", true));
+            // await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
+            // {
+            //     string? command = c.Data.Options.First(x => x.Name == "command").Value.ToString();
+            //     if (string.IsNullOrWhiteSpace(command))
+            //     {
+            //         await UpdateMessageContent(m, "No command provided.");
+            //         return false;
+            //     }
+            //     await steamCmdController.RunCommand(command);
+            //     return true;
+            // }, new SlashCommandOptionBuilder().AddOption("command", ApplicationCommandOptionType.String, "The command to run", true));
             
             await SendMessage("ProfileServer started and ready.");
         };
