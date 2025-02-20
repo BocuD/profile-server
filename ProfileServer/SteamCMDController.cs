@@ -17,12 +17,9 @@ public class SteamCMDController
     private bool lastCommandCompleted = false;
     private string lastMessage = "";
     
-    private int processId = 0;
-
-    private string username;
-    private string password;
+    private readonly int processId = 0;
     
-    private static readonly Regex AnsiEscape = new(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
+    private static readonly Regex ansiEscape = new(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
     
     public SteamCMDController(string username, string password)
     {
@@ -43,7 +40,7 @@ public class SteamCMDController
 
                 //process each line individually
                 //remove all \r and ansi escape characters
-                string cleanLine = AnsiEscape.Replace(data, "").Replace("\r", "");
+                string cleanLine = ansiEscape.Replace(data, "").Replace("\r", "");
                 if (string.IsNullOrWhiteSpace(cleanLine)) return;
                 
                 string[] cleanedLines = cleanLine.Split('\n');
@@ -53,17 +50,8 @@ public class SteamCMDController
 
                     if (statusMessage != 0)
                     {
-                        currentCommandLog += "[steamcmd] " + line + "\n";
-                        
-                        //ensure only 20 lines remain at any time
-                        string[] lines = currentCommandLog.Split('\n');
-                        if (lines.Length > 20)
-                        {
-                            currentCommandLog = string.Join('\n', lines[^20..]);
-                        }
-                        
                         //filter out the styling stuff only intended for the console
-                        await DiscordBot.Instance.UpdateMessageContent(statusMessage, currentCommandLog);
+                        await DiscordBot.Instance.UpdateMessageContent(statusMessage, "[steamcmd] " + line.Replace("\n", ""));
                     }
                     
                     //we need 2FA
@@ -120,8 +108,7 @@ public class SteamCMDController
         processId = info.dwProcessId;
     }
 
-    private string currentCommandLog;
-    public async Task<bool> RunCommand(string command)
+    public async Task<bool> RunCommand(string command, ulong message = 0)
     {
         if (!running)
         {
@@ -140,13 +127,15 @@ public class SteamCMDController
         }
 
         lastCommandCompleted = false;
-        currentCommandLog = "";
+        statusMessage = message;
         await steamCmd.WriteLineAsync(command);
         
         while (!lastCommandCompleted)
         {
             await Task.Delay(100);
         }
+        
+        statusMessage = 0;
         return true;
     }
     
@@ -166,13 +155,13 @@ public class SteamCMDController
     }
 
     [DllImport("kernel32.dll")]
-    static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+    private static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
     [DllImport("kernel32.dll")]
-    static extern uint SuspendThread(IntPtr hThread);
+    private static extern uint SuspendThread(IntPtr hThread);
     [DllImport("kernel32.dll")]
-    static extern int ResumeThread(IntPtr hThread);
+    private static extern int ResumeThread(IntPtr hThread);
     [DllImport("kernel32", CharSet = CharSet.Auto,SetLastError = true)]
-    static extern bool CloseHandle(IntPtr handle);
+    private static extern bool CloseHandle(IntPtr handle);
 
 
     private static void SuspendProcess(int pid)
@@ -210,7 +199,7 @@ public class SteamCMDController
                 continue;
             }
 
-            var suspendCount = 0;
+            int suspendCount = 0;
             do
             {
                 suspendCount = ResumeThread(pOpenThread);
@@ -223,11 +212,7 @@ public class SteamCMDController
     private ulong statusMessage;
     public async Task UpdateGame(string gameId, string betaBranch, ulong message)
     {
-        statusMessage = message;
-        
-        await RunCommand("force_install_dir ./game");
-        await RunCommand($"app_update {gameId} -beta {betaBranch} validate");
-
-        statusMessage = 0;
+        await RunCommand("force_install_dir ./game", message);
+        await RunCommand($"app_update {gameId} -beta {betaBranch} validate", message);
     }
 }

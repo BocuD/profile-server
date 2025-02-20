@@ -1,4 +1,5 @@
-﻿using Discord;
+﻿using System.Diagnostics;
+using Discord;
 using Discord.Net;
 using Discord.Rest;
 using Discord.WebSocket;
@@ -25,7 +26,7 @@ public class DiscordBot
 
     private readonly DiscordSocketClient client;    
     private readonly SteamCMDController steamCmdController;
-    private readonly GameContainer gameContainer;
+    private GameContainer? gameContainer;
     
     private readonly string gameId = Environment.GetEnvironmentVariable("STEAMGAMEID") ?? 
                                      throw new ArgumentNullException("STEAMGAMEID environment variable not set.");
@@ -36,6 +37,12 @@ public class DiscordBot
     private readonly string gameExecutable = Environment.GetEnvironmentVariable("GAMEBINARY") ?? 
                                               throw new ArgumentNullException("GAMEBINARY environment variable not set.");
     
+    private readonly string gameArgs = Environment.GetEnvironmentVariable("GAMEARGS") ?? 
+                                       throw new ArgumentNullException("GAMEARGS environment variable not set.");
+    
+    private readonly string unrealInsightsPath = Environment.GetEnvironmentVariable("UNREALINSIGHTSPATH") ??
+                                throw new ArgumentNullException("UNREALINSIGHTSPATH environment variable not set.");
+
     public DiscordBot()
     {
         Instance = this;
@@ -49,16 +56,15 @@ public class DiscordBot
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
             Log.Error("Steam username or password not set in environment!");
-            return;
+            throw new ArgumentNullException("Steam username or password not set in environment!");
         }
 
         //start steamcmd
         steamCmdController = new SteamCMDController(username, password);
-        gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable);
     }
 
-    private SocketGuild? guild;
-    private SocketTextChannel? channel;
+    private SocketGuild guild;
+    private SocketTextChannel channel;
     
     public async Task Init()
     {
@@ -75,51 +81,71 @@ public class DiscordBot
 
         client.Ready += async () =>
         {
-            await VerifyGuild();
+            VerifyGuild();
+            VerifyUnrealInsights();
             
-            await CreateGuildCommand("update-game", "Update the game to the latest version", async m =>
+            await CreateGuildCommand("update-game", "Update the game to the latest version", async (c, m) =>
             {
                 await steamCmdController.UpdateGame(gameId, betaBranch, m);
+                return true;
             });
             
-            await CreateGuildCommand("start-game", "Start the game instance", async m =>
+            await CreateGuildCommand("run-game", "Start a game instance and collect trace data", async (c, m) =>
             {
-                gameContainer.Start();
+                if (gameContainer is { IsRunning: true })
+                {
+                    await UpdateMessageContent(m, "Game is already running.");
+                    return false;
+                }
+                else
+                {
+                    gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
+                    await gameContainer.Run(m);
+                    return true;
+                }
             });
+            
+            await CreateGuildCommand("stop-game", "Stop the running game instance", async (c, m) =>
+            {
+                if (gameContainer is { IsRunning: true })
+                {
+                    gameContainer.Stop();
+                    await UpdateMessageContent(m, "Game force stopped.");
+                    return true;
+                }
+                else
+                {
+                    await UpdateMessageContent(m, "No game running.");
+                    return false;
+                }
+            });
+            
+            // await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
+            // {
+            //     string? command = c.Data.Options.First(x => x.Name == "command").Value.ToString();
+            //     if (string.IsNullOrWhiteSpace(command))
+            //     {
+            //         await UpdateMessageContent(m, "No command provided.");
+            //         return false;
+            //     }
+            //     await steamCmdController.RunCommand(command);
+            //     return true;
+            // }, new SlashCommandOptionBuilder().AddOption("command", ApplicationCommandOptionType.String, "The command to run", true));
+            
+            await SendMessage("ProfileServer started and ready.");
         };
         
-        client.InteractionCreated += async (interaction) =>
+        client.InteractionCreated += (interaction) =>
         {
             if (interaction is SocketSlashCommand command)
             {
-                if (commands.TryGetValue(command.Data.Name, out Func<ulong, Task>? action))
+                if (commands.TryGetValue(command.Data.Name, out Func<SocketSlashCommand, ulong, Task<bool>>? action))
                 {
-                    RestInteractionMessage message = null;
-                    try
-                    {
-                        //send a response to indicate the command is being executed
-                        await command.RespondAsync($">{command.Data.Name} - Executing command...");
-                        message = await command.GetOriginalResponseAsync();
-
-                        await action.Invoke(message.Id);
-                        
-                        await UpdateMessageContent(message.Id, $"{message.Content}\n>{command.Data.Name} - Command executed successfully.");
-                    }
-                    catch (Exception e)
-                    {
-                        if (message == null)
-                        {
-                            //send the error message to discord
-                            await command.RespondAsync($"An error occurred while executing command `{command.Data.Name}`: " + e.Message);
-                        }
-                        else
-                        {
-                            await message.ModifyAsync(x =>
-                                x.Content = $"{x.Content}\n>An error occurred while executing command `{command.Data.Name}`: " + e.Message);
-                        }
-                    }
+                    _ = Task.Run(async () => await ExecuteCommand(command, action));
                 }
             }
+
+            return Task.CompletedTask;
         };
         
         client.ButtonExecuted += async (interaction) =>
@@ -146,28 +172,96 @@ public class DiscordBot
             await interaction.RespondAsync("Steam Guard code received. Submitting...");
         };
     }
-    
-    private async Task VerifyGuild()
+
+    private async Task ExecuteCommand(SocketSlashCommand command, Func<SocketSlashCommand, ulong, Task<bool>> action)
     {
-        guild = client.GetGuild(guildId);
-        channel = client.GetGuild(guildId)?.GetTextChannel(channelId);
-        
-        if (guild == null)
+        RestInteractionMessage? message = null;
+        try
+        {
+            //send a response to indicate the command is being executed
+            await command.RespondAsync($">{command.Data.Name} - Executing command...\n");
+            message = await command.GetOriginalResponseAsync();
+
+            messageContent.Add(message.Id, message.Content);
+
+            bool success = await action.Invoke(command, message.Id);
+            
+            await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command execution {(success ? "successful" : "failed")}");
+        }
+        catch (Exception e)
+        {
+            if (message == null)
+            {
+                //send the error message to discord
+                await command.RespondAsync($"An error occurred while executing command `{command.Data.Name}`: " + e.Message);
+            }
+            else
+            {
+                await message.ModifyAsync(x =>
+                    x.Content = $"{x.Content}\n>An error occurred while executing command `{command.Data.Name}`: " + e.Message);
+            }
+        }
+    }
+
+    private void VerifyUnrealInsights()
+    {
+        //check if a process is running with the name UnrealInsights.exe
+        if (Process.GetProcessesByName("UnrealInsights").Length == 0)
+        {
+            Log.Information("UnrealInsights not running. Starting...");
+            
+            //check if the file exists
+            if (!File.Exists(unrealInsightsPath))
+            {
+                throw new FileNotFoundException("UnrealInsights executable not found at: " + unrealInsightsPath);
+            }
+            
+            //start the process
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = unrealInsightsPath
+            };
+            
+            Process.Start(startInfo);
+        }
+        else
+        {
+            Log.Information("UnrealInsights is already running.");
+        }
+    }
+
+    private void VerifyGuild()
+    {
+        SocketGuild? g = client.GetGuild(guildId);
+        SocketTextChannel? c = client.GetGuild(guildId)?.GetTextChannel(channelId);
+
+        if (g == null)
         {
             Log.Error("[Discord] Guild not found: {guildId}", guildId);
         }
-        
-        if (channel == null)
+        else
+        {
+            guild = g;
+        }
+
+        if (c == null)
         {
             Log.Error("[Discord] Channel not found: {channelId}", channelId);
         }
+        else
+        {
+            channel = c;
+        }
     }
-    
-    private async Task CreateGuildCommand(string name, string description, Func<ulong, Task> action)
+
+    private async Task CreateGuildCommand(string name, string description, Func<SocketSlashCommand, ulong, Task<bool>> action, SlashCommandOptionBuilder? options = null)
     {
         SlashCommandBuilder? command = new SlashCommandBuilder()
             .WithName(name)
             .WithDescription(description);
+
+        if (options != null)
+            command.Options.Add(options);
         
         try 
         {
@@ -191,7 +285,7 @@ public class DiscordBot
     }
     
     //async action version
-    private readonly Dictionary<string, Func<ulong, Task>> commands = new();
+    private readonly Dictionary<string, Func<SocketSlashCommand, ulong, Task<bool>>> commands = new();
 
     public async Task SendMessage(string message)
     {
@@ -242,14 +336,31 @@ public class DiscordBot
         return twoFactorCodeResponse;
     }
 
+    private readonly SemaphoreSlim messageLock = new(1);
+    private readonly Dictionary<ulong, string> messageContent = new();
+    
     public async Task UpdateMessageContent(ulong statusMessage, string content)
     {
-        var message = await channel.GetMessageAsync(statusMessage);
+        await messageLock.WaitAsync();
+        messageContent.TryGetValue(statusMessage, out string? currentContent);
         
+        IMessage? message = await channel.GetMessageAsync(statusMessage);
+
+        string newMessage = currentContent + "\n" + GetDiscordRelativeTimestamp(DateTime.UtcNow) + content;
         //modify the message with the new content
         if (message is RestUserMessage restMessage)
         {
-            await restMessage.ModifyAsync(x => x.Content = content);
+            await restMessage.ModifyAsync(x => x.Content = newMessage);
         }
+        
+        //update the dictionary
+        messageContent[statusMessage] = newMessage;
+        
+        messageLock.Release();
+    }
+
+    private static string GetDiscordRelativeTimestamp(DateTime dateTime)
+    {
+        return $"<t:{(int) dateTime.Subtract(new DateTime(1970, 1, 1)).TotalSeconds}:T>";
     }
 }

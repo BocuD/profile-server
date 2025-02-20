@@ -1,6 +1,6 @@
 ### ProfileServer
 
-Automated system to download, update and launch a steam game
+Automated system to download, update and launch, and profile an Unreal based steam game
 
 ### Usage
 
@@ -11,6 +11,12 @@ STEAMUSERNAME=
 STEAMPASSWORD=
 STEAMGAMEID=
 STEAMBETABRANCH=
+GAMEBINARY=
+GAMEARGS=
+DISCORD_TOKEN=
+DISCORD_GUILD=
+DISCORD_CHANNEL=
+UNREALINSIGHTSPATH=  (probably "C:\Program Files\Epic Games\UE_5.4\Engine\Binaries\Win64\UnrealInsights.exe")
 ```
 
-Building and launching the executable with valid parameters will log into steam and start downloading the game. You will probably need to authenticate steam guard as well, the server will prompt you for this in the console.
+Building and launching the executable with valid parameters will log into Discord and enable you to download the game. Status updates will be reported on the Discord channel. The game can also be started from here.
