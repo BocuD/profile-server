@@ -37,6 +37,9 @@ public class DiscordBot
     private readonly string gameExecutable = Environment.GetEnvironmentVariable("GAMEBINARY") ?? 
                                               throw new ArgumentNullException("GAMEBINARY environment variable not set.");
     
+    private readonly string gameArgs = Environment.GetEnvironmentVariable("GAMEARGS") ?? 
+                                       throw new ArgumentNullException("GAMEARGS environment variable not set.");
+    
     private readonly string unrealInsightsPath = Environment.GetEnvironmentVariable("UNREALINSIGHTSPATH") ??
                                 throw new ArgumentNullException("UNREALINSIGHTSPATH environment variable not set.");
 
@@ -96,7 +99,7 @@ public class DiscordBot
                 }
                 else
                 {
-                    gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable);
+                    gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
                     await gameContainer.Run(m);
                     return true;
                 }

@@ -4,7 +4,7 @@ using Serilog;
 
 namespace ProfileServer;
 
-public class GameContainer(string workingDirectory, string executable)
+public class GameContainer(string workingDirectory, string executable, string args)
 {
     //start game process
     private readonly Process gameProcess = new()
@@ -13,7 +13,8 @@ public class GameContainer(string workingDirectory, string executable)
         {
             FileName = workingDirectory + executable,
             WorkingDirectory = workingDirectory,
-            UseShellExecute = false
+            UseShellExecute = false,
+            Arguments = args
         }
     };
     private DateTime startTime;
