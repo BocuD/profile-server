@@ -81,36 +81,53 @@ public class DiscordBot
             VerifyGuild();
             VerifyUnrealInsights();
             
-            await CreateGuildCommand("update-game", "Update the game to the latest version", async m =>
+            await CreateGuildCommand("update-game", "Update the game to the latest version", async (c, m) =>
             {
                 await steamCmdController.UpdateGame(gameId, betaBranch, m);
+                return true;
             });
             
-            await CreateGuildCommand("run-game", "Start a game instance and collect trace data", async m =>
+            await CreateGuildCommand("run-game", "Start a game instance and collect trace data", async (c, m) =>
             {
                 if (gameContainer is { IsRunning: true })
                 {
                     await UpdateMessageContent(m, "Game is already running.");
+                    return false;
                 }
                 else
                 {
                     gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable);
                     await gameContainer.Run(m);
+                    return true;
                 }
             });
             
-            await CreateGuildCommand("stop-game", "Stop the running game instance", async m =>
+            await CreateGuildCommand("stop-game", "Stop the running game instance", async (c, m) =>
             {
                 if (gameContainer is { IsRunning: true })
                 {
                     gameContainer.Stop();
                     await UpdateMessageContent(m, "Game force stopped.");
+                    return true;
                 }
                 else
                 {
                     await UpdateMessageContent(m, "No game running.");
+                    return false;
                 }
             });
+            
+            await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
+            {
+                string? command = c.Data.Options.First(x => x.Name == "command").Value.ToString();
+                if (string.IsNullOrWhiteSpace(command))
+                {
+                    await UpdateMessageContent(m, "No command provided.");
+                    return false;
+                }
+                await steamCmdController.RunCommand(command);
+                return true;
+            }, new SlashCommandOptionBuilder().AddOption("command", ApplicationCommandOptionType.String, "The command to run", true));
             
             await SendMessage("ProfileServer started and ready.");
         };
@@ -119,7 +136,7 @@ public class DiscordBot
         {
             if (interaction is SocketSlashCommand command)
             {
-                if (commands.TryGetValue(command.Data.Name, out Func<ulong, Task>? action))
+                if (commands.TryGetValue(command.Data.Name, out Func<SocketSlashCommand, ulong, Task<bool>>? action))
                 {
                     _ = Task.Run(async () => await ExecuteCommand(command, action));
                 }
@@ -153,7 +170,7 @@ public class DiscordBot
         };
     }
 
-    private async Task ExecuteCommand(SocketSlashCommand command, Func<ulong, Task> action)
+    private async Task ExecuteCommand(SocketSlashCommand command, Func<SocketSlashCommand, ulong, Task<bool>> action)
     {
         RestInteractionMessage? message = null;
         try
@@ -164,9 +181,9 @@ public class DiscordBot
 
             messageContent.Add(message.Id, message.Content);
 
-            await action.Invoke(message.Id);
-                        
-            await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command executed successfully.");
+            bool success = await action.Invoke(command, message.Id);
+            
+            await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command execution {(success ? "successful" : "failed")}");
         }
         catch (Exception e)
         {
@@ -234,11 +251,14 @@ public class DiscordBot
         }
     }
 
-    private async Task CreateGuildCommand(string name, string description, Func<ulong, Task> action)
+    private async Task CreateGuildCommand(string name, string description, Func<SocketSlashCommand, ulong, Task<bool>> action, SlashCommandOptionBuilder? options = null)
     {
         SlashCommandBuilder? command = new SlashCommandBuilder()
             .WithName(name)
             .WithDescription(description);
+
+        if (options != null)
+            command.Options.Add(options);
         
         try 
         {
@@ -262,7 +282,7 @@ public class DiscordBot
     }
     
     //async action version
-    private readonly Dictionary<string, Func<ulong, Task>> commands = new();
+    private readonly Dictionary<string, Func<SocketSlashCommand, ulong, Task<bool>>> commands = new();
 
     public async Task SendMessage(string message)
     {
