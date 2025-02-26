@@ -384,4 +384,16 @@ public class DiscordBot
     {
         return $"<t:{(int) dateTime.Subtract(new DateTime(1970, 1, 1)).TotalSeconds}:T>";
     }
+    
+    public async Task SendFile(string path, string message)
+    {
+        try
+        {
+            await channel.SendFileAsync(path, message);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Failed to send file: " + e.Message);
+        }
+    }
 }

@@ -79,6 +79,8 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     string output = Path.Combine(Environment.CurrentDirectory, "output", Path.GetFileName(trace));
                     File.Move(trace, output);
 
+                    await DiscordBot.Instance.SendFile(output, "Trace data collected");
+
                     await DiscordBot.Instance.UpdateMessageContent(message,
                         "Trace data collected: " + Path.GetFileName(trace));
                     
