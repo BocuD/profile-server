@@ -348,6 +348,14 @@ public class DiscordBot
         IMessage? message = await channel.GetMessageAsync(statusMessage);
 
         string newMessage = currentContent + "\n" + GetDiscordRelativeTimestamp(DateTime.UtcNow) + content;
+        
+        //filter message to up to 10 lines
+        string[] lines = newMessage.Split('\n');
+        if (lines.Length > 10)
+        {
+            newMessage = string.Join('\n', lines.Skip(lines.Length - 10));
+        }
+        
         //modify the message with the new content
         if (message is RestUserMessage restMessage)
         {
