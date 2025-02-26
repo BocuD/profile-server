@@ -98,12 +98,11 @@ public class DiscordBot
                     await UpdateMessageContent(m, "Game is already running.");
                     return false;
                 }
-                else
-                {
-                    gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
-                    await gameContainer.Run(m);
-                    return true;
-                }
+
+                VerifyUnrealInsights();
+                gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
+                await gameContainer.Run(m);
+                return true;
             });
             
             await CreateGuildCommand("stop-game", "Stop the running game instance", async (c, m) =>
@@ -204,31 +203,44 @@ public class DiscordBot
         }
     }
 
-    private void VerifyUnrealInsights()
+    private Process? UnrealInsightsProcess = null;
+    
+    private async void VerifyUnrealInsights()
     {
+        if (UnrealInsightsProcess is { HasExited: false })
+        {
+            Log.Information("UnrealInsights already running.");
+            return;
+        }
+        
         //check if a process is running with the name UnrealInsights.exe
         if (Process.GetProcessesByName("UnrealInsights").Length == 0)
         {
             Log.Information("UnrealInsights not running. Starting...");
-            
+
             //check if the file exists
             if (!File.Exists(unrealInsightsPath))
             {
                 throw new FileNotFoundException("UnrealInsights executable not found at: " + unrealInsightsPath);
             }
-            
+
             //start the process
             ProcessStartInfo startInfo = new()
             {
                 FileName = unrealInsightsPath
             };
+
+            UnrealInsightsProcess = Process.Start(startInfo);
+
+            if (UnrealInsightsProcess == null)
+            {
+                throw new Exception("Failed to start UnrealInsights process.");
+            }
+        }
+
+        Log.Information("UnrealInsights is already running.");
             
-            Process.Start(startInfo);
-        }
-        else
-        {
-            Log.Information("UnrealInsights is already running.");
-        }
+        UnrealInsightsProcess = Process.GetProcessesByName("UnrealInsights").First();
     }
 
     private void VerifyGuild()
