@@ -68,6 +68,8 @@ public class DiscordBot
     
     public async Task Init()
     {
+        VerifyUnrealInsights();
+        
         client.Log += msg =>
         {
             Log.Information("[Discord] " + msg.Message);
@@ -82,7 +84,6 @@ public class DiscordBot
         client.Ready += async () =>
         {
             VerifyGuild();
-            VerifyUnrealInsights();
             
             await CreateGuildCommand("update-game", "Update the game to the latest version", async (c, m) =>
             {
