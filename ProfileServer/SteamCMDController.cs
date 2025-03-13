@@ -77,9 +77,11 @@ public class SteamCMDController
 
                     if (line.Contains("OK"))
                     {
-                        if (lastMessage.Contains("Waiting for user info...") || line.Contains("OK"))
+                        if (lastMessage.Contains("Waiting for user info...") || line.Contains("Waiting for user info..."))
                         {
                             authenticated = true;
+                            await DiscordBot.Instance.SendMessage("[steamcmd] Successfully authenticated with Steam.");
+                            Log.Information("Successfully authenticated with Steam.");
                         }
                     }
 
