@@ -62,6 +62,17 @@ public class SteamCMDController
                         await steamCmd.WriteLineAsync(twoFactorCode);
                     }
                     
+                    if (line.Contains("a Steam Guard mobile"))
+                    {
+                        await DiscordBot.Instance.SendMessage("[steamcmd] " + line);
+                    }
+                    
+                    //we need to wait for the user to accept the steam guard prompt
+                    if (line.Contains("Please confirm the login in the Steam Mobile app on your phone."))
+                    {
+                        await DiscordBot.Instance.SendMessage("[steamcmd] Please confirm the login in the Steam Mobile app on your phone.");
+                    }
+                    
                     if (line.Contains("Steam>")) lastCommandCompleted = true;
 
                     if (line.Contains("OK"))
@@ -104,7 +115,7 @@ public class SteamCMDController
             Directory.CreateDirectory("steamcmd");
         }
         
-        ProcessInfo info = steamCmd.Start();
+        ProcessInfo info = steamCmd.Start(1000);
         processId = info.dwProcessId;
     }
 
