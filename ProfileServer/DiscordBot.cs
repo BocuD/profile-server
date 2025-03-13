@@ -101,8 +101,7 @@ public class DiscordBot
 
                 VerifyUnrealInsights();
                 gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
-                await gameContainer.Run(m);
-                return true;
+                return await gameContainer.Run(m);
             });
             
             await CreateGuildCommand("stop-game", "Stop the running game instance", async (c, m) =>
@@ -178,6 +177,9 @@ public class DiscordBot
         RestInteractionMessage? message = null;
         try
         {
+            string invokingUser = command.User.Username;
+            Log.Information("Executing command: {command} invoked by {user}", command.Data.Name, invokingUser);
+            
             //send a response to indicate the command is being executed
             await command.RespondAsync($">{command.Data.Name} - Executing command...\n");
             message = await command.GetOriginalResponseAsync();
@@ -187,6 +189,7 @@ public class DiscordBot
             bool success = await action.Invoke(command, message.Id);
             
             await UpdateMessageContent(message.Id, $"{command.Data.Name} - Command execution {(success ? "successful" : "failed")}");
+            Log.Information($"Command execution {(success ? "successful" : "failed")}");
         }
         catch (Exception e)
         {

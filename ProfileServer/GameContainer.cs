@@ -20,12 +20,14 @@ public class GameContainer(string workingDirectory, string executable, string ar
     private DateTime startTime;
     public bool IsRunning => !gameProcess.HasExited;
 
-    public async Task Run(ulong message)
+    public async Task<bool> Run(ulong message)
     {
         startTime = DateTime.Now;
         
         //adding a delay here to ensure the trace timestamp is after the game start
         await Task.Delay(2000);
+
+        int exitCode = -1;
         
         gameProcess.Start();
         
@@ -37,6 +39,14 @@ public class GameContainer(string workingDirectory, string executable, string ar
             await gameProcess.WaitForExitAsync();
             await DiscordBot.Instance.UpdateMessageContent(message, "Game exited with code " + gameProcess.ExitCode);
             Log.Information("Game exited with code {ExitCode}", gameProcess.ExitCode);
+            
+            if (gameProcess.ExitCode != 0)
+            {
+                Log.Warning("Game exited with non-zero exit code");
+                await DiscordBot.Instance.UpdateMessageContent(message, "Warning: Game exited with non-zero exit code!");
+            }
+            
+            exitCode = gameProcess.ExitCode;
 
             //give the game some time to finish writing the trace
             await Task.Delay(3000);
@@ -45,6 +55,8 @@ public class GameContainer(string workingDirectory, string executable, string ar
             Log.Information("Collecting trace data...");
             await GetTraceData(message);
         });
+
+        return exitCode == 0;
     }
     
     public void Stop()
