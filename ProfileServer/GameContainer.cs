@@ -102,7 +102,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                         //commit the new file to git
                         string gitPath = Path.Combine(Environment.CurrentDirectory, "output");
                         string gitExe = "\"C:\\Program Files\\Git\\bin\\git.exe\"";
-                        string gitCommand = $"& {gitExe} add {output} && {gitExe} commit -m \"Trace data\" && {gitExe} push";
+                        string gitCommand = $"& {gitExe} add {output} && & {gitExe} commit -m \"Trace data\" && & {gitExe} push";
 
                         using (PowerShell powerShell = PowerShell.Create())
                         {
