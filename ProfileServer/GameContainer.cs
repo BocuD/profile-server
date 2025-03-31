@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using System.Management.Automation;
 using Serilog;
 
 namespace ProfileServer;
@@ -102,28 +103,28 @@ public class GameContainer(string workingDirectory, string executable, string ar
                         string gitPath = Path.Combine(Environment.CurrentDirectory, "output");
                         string gitCommand = $"git add {output} && git commit -m \"Trace data\" && git push";
 
-                        ProcessStartInfo startInfo = new()
+                        using (PowerShell powerShell = PowerShell.Create())
                         {
-                            FileName = "cmd.exe",
-                            Arguments = $"/C {gitCommand}",
-                            WorkingDirectory = gitPath,
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-
-                        using Process process = new()
-                        {
-                            StartInfo = startInfo
-                        };
-
-                        process.Start();
-
-                        await process.WaitForExitAsync();
-
-                        string outputResult = await process.StandardOutput.ReadToEndAsync();
-
-                        await DiscordBot.Instance.UpdateMessageContent(message, outputResult);
+                            powerShell.AddScript($"cd {gitPath}");
+                            powerShell.AddScript(gitCommand);
+                            var results = powerShell.Invoke();
+                            
+                            if (powerShell.HadErrors)
+                            {
+                                foreach (var error in powerShell.Streams.Error)
+                                {
+                                    Log.Error("Git error: {Error}", error.ToString());
+                                    await DiscordBot.Instance.UpdateMessageContent(message, "Git error: " + error);
+                                }
+                            }
+                            else
+                            {
+                                Log.Information("Git command executed successfully");
+                                string commandOutput = string.Join(Environment.NewLine, results);
+                                Log.Information("Git command output: {Output}", commandOutput);
+                                await DiscordBot.Instance.UpdateMessageContent(message, $"Git: {commandOutput}");
+                            }
+                        }
                     }
 
                     long fileSize = new FileInfo(output).Length;
