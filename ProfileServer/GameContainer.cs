@@ -114,7 +114,11 @@ public class GameContainer(string workingDirectory, string executable, string ar
                             {
                                 foreach (var error in powerShell.Streams.Error)
                                 {
-                                    Log.Error("Git error: {Error}", error.ToString());
+                                    //Git error: remote: warning: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com/.17:34:00Git error: To https://github.com/BUAS-Game1/PaletteCleanserProfileOutput.git
+                                    //remove large file detected urls
+                                    string filtered = error.ToString();
+                                    filtered = filtered.Replace("https://git-lfs.github.com/", "");
+                                    Log.Error("Git error: {Error}", filtered);
                                     await DiscordBot.Instance.UpdateMessageContent(message, "Git error: " + error);
                                 }
                             }
