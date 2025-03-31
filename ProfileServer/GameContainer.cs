@@ -95,7 +95,37 @@ public class GameContainer(string workingDirectory, string executable, string ar
 
                     await DiscordBot.Instance.UpdateMessageContent(message,
                         "Trace data collected: " + Path.GetFileName(trace));
-                    
+
+                    if (Environment.GetEnvironmentVariable("ENABLE_GIT") == "TRUE") 
+                    {
+                        //commit the new file to git
+                        string gitPath = Path.Combine(Environment.CurrentDirectory, "output");
+                        string gitCommand = $"git add {output} && git commit -m \"Trace data\" && git push";
+
+                        ProcessStartInfo startInfo = new()
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/C {gitCommand}",
+                            WorkingDirectory = gitPath,
+                            RedirectStandardOutput = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+
+                        using Process process = new()
+                        {
+                            StartInfo = startInfo
+                        };
+
+                        process.Start();
+
+                        await process.WaitForExitAsync();
+
+                        string outputResult = await process.StandardOutput.ReadToEndAsync();
+
+                        await DiscordBot.Instance.UpdateMessageContent(message, outputResult);
+                    }
+
                     long fileSize = new FileInfo(output).Length;
                     
                     Log.Information("Trace data collected: {Trace} ({fileSize})", Path.GetFileName(trace), PrettyBytes(fileSize));
