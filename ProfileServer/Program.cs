@@ -19,11 +19,13 @@ if (!File.Exists(path))
 
 foreach (string line in File.ReadAllLines(path))
 {
-    string[] parts = line.Split('=');
-    if (parts.Length == 2)
-    {
-        Environment.SetEnvironmentVariable(parts[0], parts[1]);
-    }
+    //split at =
+    int index = line.IndexOf('=');
+    if (index == -1) continue;
+    string name = line.Substring(0, index).Trim();
+    string arg = line.Substring(index + 1).Trim();
+
+    Environment.SetEnvironmentVariable(name, arg);
 }
 
 //set up discord
