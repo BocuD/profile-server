@@ -25,7 +25,7 @@ public class SteamCMDController
     {
         steamCmd = new SteamCMDConPTY
         {
-            Arguments = $"+login {username} {password}",
+            Arguments = $"+force_install_dir ./game +login {username} {password}",
             WorkingDirectory = Environment.CurrentDirectory + "/steamcmd"
         };
         
@@ -225,7 +225,6 @@ public class SteamCMDController
     private ulong statusMessage;
     public async Task UpdateGame(string gameId, string betaBranch, ulong message)
     {
-        await RunCommand("force_install_dir ./game", message);
         await RunCommand($"app_update {gameId} -beta {betaBranch} validate", message);
     }
 }
