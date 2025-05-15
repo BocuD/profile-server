@@ -30,6 +30,19 @@ public class GameContainer(string workingDirectory, string executable, string ar
 
         int exitCode = -1;
         
+        //check log folders before starting the game
+        string logDirectory = "PaletteCleanser/Saved/Profiling/FPSChartStats";
+        string fullLogDirectory = Path.Combine(workingDirectory, logDirectory);
+        await DiscordBot.Instance.UpdateMessageContent(message, $"Checking performance log directory at {fullLogDirectory}...");
+        if (!Directory.Exists(fullLogDirectory))
+        {
+            await DiscordBot.Instance.UpdateMessageContent(message, "Creating performance log directory...");
+            Directory.CreateDirectory(fullLogDirectory);
+        }
+        
+        //get subdirectories
+        string[] subdirectories = Directory.GetDirectories(fullLogDirectory);
+        
         gameProcess.Start();
         
         await DiscordBot.Instance.UpdateMessageContent(message, "Game started");
@@ -55,11 +68,13 @@ public class GameContainer(string workingDirectory, string executable, string ar
             await DiscordBot.Instance.UpdateMessageContent(message, "Collecting trace data...");
             Log.Information("Collecting trace data...");
             await GetTraceData(message);
+
+            await GetPerformanceData(message, fullLogDirectory, subdirectories);
         });
 
         return exitCode == 0;
     }
-    
+
     public void Stop()
     {
         if (gameProcess.HasExited) return;
@@ -136,6 +151,93 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     
                     Log.Information("Trace data collected: {Trace} ({fileSize})", Path.GetFileName(trace), PrettyBytes(fileSize));
                 }
+            }
+        }
+    }
+    
+    private async Task GetPerformanceData(ulong message, string fullLogDirectory, string[] subdirectories)
+    {
+        //get subdirectories
+        string[] updatedSubDirectories = Directory.GetDirectories(fullLogDirectory);
+        
+        //check if any new subdirectories were created
+        List<string> newSubdirs = updatedSubDirectories.Where(directory => !subdirectories.Contains(directory)).ToList();
+        
+        if (newSubdirs.Count == 0)
+        {
+            await DiscordBot.Instance.UpdateMessageContent(message, "No new performance data found");
+            return;
+        }
+
+        foreach (string directory in newSubdirs)
+        {
+            await DiscordBot.Instance.UpdateMessageContent(message, "New performance data found: " + directory);
+            
+            //get the .log file
+            string[] logFiles = Directory.GetFiles(directory, "*.log");
+
+            foreach (string logFile in logFiles)
+            {
+                await DiscordBot.Instance.SendFile(logFile, "Performance log collected");
+                await DiscordBot.Instance.UpdateMessageContent(message,
+                    "Performance log collected: " + Path.GetFileName(logFile));
+            }
+            
+            //get the .csv file
+            string[] csvFiles = Directory.GetFiles(directory, "*.csv");
+            
+            foreach (string csvFile in csvFiles)
+            {
+                await DiscordBot.Instance.SendFile(csvFile, "Performance CSV data collected");
+                await DiscordBot.Instance.UpdateMessageContent(message,
+                    "Performance CSV data collected: " + Path.GetFileName(csvFile));
+            }
+            
+            //parse the .csv
+            foreach (string csvFile in csvFiles)
+            {
+                string[] lines = File.ReadAllLines(csvFile);
+                if (lines.Length == 0) continue;
+                
+                //disregard the first 4 lines
+                if (lines.Length > 4)
+                {
+                    lines = lines.Skip(4).ToArray();
+                }
+
+                //parse the first line
+                string[] headers = lines[0].Split(',');
+                
+                List<float> frameTimes = [];
+                
+                //parse the rest of the lines (skipping first 20 frames)
+                for (int i = 20; i < lines.Length; i++)
+                {
+                    string[] values = lines[i].Split(',');
+                    frameTimes.Add(float.Parse(values[1]));
+                }
+                
+                //calculate the average frame time
+                float averageFrameTime = frameTimes.Average();
+                float averageFPS = 1000f / averageFrameTime;
+                
+                //calculate the 99th percentile frame time
+                int index = (int) (frameTimes.Count * 0.99);
+                float percentile99 = frameTimes.OrderBy(x => x).ElementAt(index);
+                float percentile99FPS = 1000f / percentile99;
+                
+                //calculate the 95th percentile frame time
+                index = (int) (frameTimes.Count * 0.95);
+                float percentile95 = frameTimes.OrderBy(x => x).ElementAt(index);
+                float percentile95FPS = 1000f / percentile95;
+                
+                //calculate maximum frame time
+                float maxFrameTime = frameTimes.Max();
+                float minFPS = 1000f / maxFrameTime;
+                
+                //send the results to discord
+                await DiscordBot.Instance.SendPerformanceReportEmbed(
+                    averageFrameTime, percentile99, percentile95, maxFrameTime);
             }
         }
     }

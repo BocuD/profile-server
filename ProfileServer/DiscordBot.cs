@@ -399,4 +399,19 @@ public class DiscordBot
             Log.Error("Failed to send file: " + e.Message);
         }
     }
+    
+    public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile99, float percentile95, float maxFrameTime)
+    {
+        Embed? embed = new EmbedBuilder()
+            .WithTitle("Performance Report")
+            .WithDescription("A new performance report was just generated.")
+            .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({(1000.0f / averageFrameTime):F2} FPS)", true)
+            .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({(1000.0f / percentile99):F2} FPS)", true)
+            .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({(1000.0f / percentile95):F2} FPS)", true)
+            .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({(1000.0f / maxFrameTime):F2})", true)
+            .WithColor(Color.Green)
+            .Build();
+
+        await channel.SendMessageAsync(embed: embed);
+    }
 }
