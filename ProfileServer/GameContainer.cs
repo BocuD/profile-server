@@ -196,7 +196,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
             //parse the .csv
             foreach (string csvFile in csvFiles)
             {
-                string[] lines = File.ReadAllLines(csvFile);
+                string[] lines = await File.ReadAllLinesAsync(csvFile);
                 if (lines.Length == 0) continue;
                 
                 //disregard the first 4 lines
@@ -219,25 +219,21 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 
                 //calculate the average frame time
                 float averageFrameTime = frameTimes.Average();
-                float averageFPS = 1000f / averageFrameTime;
-                
+
                 //calculate the 99th percentile frame time
                 int index = (int) (frameTimes.Count * 0.99);
                 float percentile99 = frameTimes.OrderBy(x => x).ElementAt(index);
-                float percentile99FPS = 1000f / percentile99;
-                
+
                 //calculate the 95th percentile frame time
                 index = (int) (frameTimes.Count * 0.95);
                 float percentile95 = frameTimes.OrderBy(x => x).ElementAt(index);
-                float percentile95FPS = 1000f / percentile95;
-                
+
                 //calculate maximum frame time
                 float maxFrameTime = frameTimes.Max();
-                float minFPS = 1000f / maxFrameTime;
-                
+
                 //send the results to discord
                 await DiscordBot.Instance.SendPerformanceReportEmbed(
-                    averageFrameTime, percentile99, percentile95, maxFrameTime);
+                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile);
             }
         }
     }

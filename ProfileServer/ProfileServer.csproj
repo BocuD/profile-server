@@ -8,6 +8,12 @@
 
     <ItemGroup>
       <PackageReference Include="Discord.Net" Version="3.17.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.5" />
       <PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" />
       <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.2.24" />
       <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.24" />
