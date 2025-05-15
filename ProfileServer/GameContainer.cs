@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ProfileServer;
 
-public class GameContainer(string workingDirectory, string executable, string args)
+public class GameContainer(string workingDirectory, string executable, string args, string gameFolder)
 {
     //start game process
     private readonly Process gameProcess = new()
@@ -31,7 +31,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
         int exitCode = -1;
         
         //check log folders before starting the game
-        string logDirectory = "PaletteCleanser/Saved/Profiling/FPSChartStats";
+        string logDirectory = $"{gameFolder}/Saved/Profiling/FPSChartStats";
         string fullLogDirectory = Path.Combine(workingDirectory, logDirectory);
         await DiscordBot.Instance.UpdateMessageContent(message, $"Checking performance log directory at {fullLogDirectory}...");
         if (!Directory.Exists(fullLogDirectory))
