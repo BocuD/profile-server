@@ -410,13 +410,13 @@ public class DiscordBot
     }
     
     public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile95, float percentile99,
-        float maxFrameTime, string csvFile)
+        float maxFrameTime, string csvFile, string svgPath)
     {
         PerformanceReport? lastReport = await _dbContext.PerformanceReports
             .OrderByDescending(x => x.created)
             .FirstOrDefaultAsync();
 
-        Embed? embed;
+        EmbedBuilder? embed;
         if (lastReport != null)
         {
             float averageDeltaPercentage = (averageFrameTime - lastReport.averageFrametime) / lastReport.averageFrametime * 100.0f;
@@ -426,21 +426,25 @@ public class DiscordBot
             
             string FPS(float frametime) => $"{(1000.0f / frametime):F2} FPS";
             string Delta(float percentage) => $"{(percentage > 0 ? "+" : "")}{percentage:F2}%";
-            
+
             embed = new EmbedBuilder()
                 .WithTitle("Performance Report")
                 .WithDescription("A new performance report was just generated.")
                 .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({FPS(averageFrameTime)}) " +
-                    $"({lastReport.averageFrametime} ms {Delta(averageDeltaPercentage)})", true)
+                                                 $"({lastReport.averageFrametime} ms {Delta(averageDeltaPercentage)})",
+                    true)
                 .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({FPS(percentile95)}) " +
-                    $"({lastReport.percentile95} ms {Delta(percentile95DeltaPercentage)})", true)
+                                                         $"({lastReport.percentile95} ms {Delta(percentile95DeltaPercentage)})",
+                    true)
                 .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({FPS(percentile99)}) " +
-                    $"({lastReport.percentile99} ms {Delta(percentile99DeltaPercentage)})", true)
+                                                         $"({lastReport.percentile99} ms {Delta(percentile99DeltaPercentage)})",
+                    true)
                 .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({FPS(maxFrameTime)}) " +
-                    $"({lastReport.maxFrameTime} ms {Delta(maxDeltaPercentage)})", true)
-                .AddField("Last report message link: ", $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})", true) 
-                .WithColor(Color.Green)
-                .Build();
+                                               $"({lastReport.maxFrameTime} ms {Delta(maxDeltaPercentage)})", true)
+                .AddField("Last report message link: ",
+                    $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
+                    true)
+                .WithColor(Color.Green);
         }
         else
         {
@@ -454,12 +458,21 @@ public class DiscordBot
                 .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({(1000.0f / percentile99):F2} FPS)",
                     true)
                 .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({(1000.0f / maxFrameTime):F2})", true)
-                .WithColor(Color.Green)
-                .Build();
+                .WithColor(Color.Green);
         }
 
-        RestUserMessage? message = await channel.SendMessageAsync(embed: embed);
-        
+        RestUserMessage? message;
+
+        if (!string.IsNullOrWhiteSpace(svgPath))
+        {
+            embed = embed.WithImageUrl($"attachment://{svgPath}");
+            message = await channel.SendFileAsync(svgPath, embed: embed.Build());
+        }
+        else
+        {
+            message = await channel.SendMessageAsync(embed: embed.Build());
+        }
+
         //add to database
         PerformanceReport report = new()
         {

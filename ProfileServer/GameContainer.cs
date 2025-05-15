@@ -230,10 +230,48 @@ public class GameContainer(string workingDirectory, string executable, string ar
 
                 //calculate maximum frame time
                 float maxFrameTime = frameTimes.Max();
-
+                
+                //generate svg by running csvtosvg
+                string csvToSvgPath = Environment.GetEnvironmentVariable("CSVTOSVGPATH") ?? "";
+                string svgPath = "";
+                if (!string.IsNullOrEmpty(csvToSvgPath))
+                {
+                    //run the tool
+                    string svgFile = Path.Combine(directory, "performance.svg");
+                    ProcessStartInfo startInfo = new()
+                    {
+                        FileName = csvToSvgPath,
+                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats renderthread/*",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    
+                    using Process process = new() { StartInfo = startInfo };
+                    process.Start();
+                    
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+                    await process.WaitForExitAsync();
+                    
+                    if (process.ExitCode != 0)
+                    {
+                        Log.Error("Error running csvtosvg: {Error}", error);
+                        await DiscordBot.Instance.UpdateMessageContent(message, "Error running csvtosvg: " + error);
+                    }
+                    else
+                    {
+                        svgPath = svgFile;
+                        await DiscordBot.Instance.SendFile(svgFile, "Performance SVG data collected");
+                        await DiscordBot.Instance.UpdateMessageContent(message,
+                            "Performance SVG data collected: " + Path.GetFileName(svgFile));
+                    }
+                }
+                
                 //send the results to discord
                 await DiscordBot.Instance.SendPerformanceReportEmbed(
-                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile);
+                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile, svgPath);
             }
         }
     }
