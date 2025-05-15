@@ -236,12 +236,13 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 string svgPath = "";
                 if (!string.IsNullOrEmpty(csvToSvgPath))
                 {
+                    Log.Information("Generating performance preview image...");
                     //run the tool
                     string svgFile = Path.Combine(directory, "performance.svg");
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = csvToSvgPath,
-                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats renderthread/*",
+                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats *",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -263,7 +264,6 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     else
                     {
                         svgPath = svgFile;
-                        await DiscordBot.Instance.SendFile(svgFile, "Performance SVG data collected");
                         await DiscordBot.Instance.UpdateMessageContent(message,
                             "Performance SVG data collected: " + Path.GetFileName(svgFile));
                     }
