@@ -410,7 +410,7 @@ public class DiscordBot
     }
     
     public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile95, float percentile99,
-        float maxFrameTime, string csvFile, string svgPath)
+        float maxFrameTime, string csvFile, string pngPath)
     {
         PerformanceReport? lastReport = await _dbContext.PerformanceReports
             .OrderByDescending(x => x.created)
@@ -463,10 +463,10 @@ public class DiscordBot
 
         RestUserMessage? message;
 
-        if (!string.IsNullOrWhiteSpace(svgPath))
+        if (!string.IsNullOrWhiteSpace(pngPath))
         {
-            embed = embed.WithImageUrl($"attachment://{svgPath}");
-            message = await channel.SendFileAsync(svgPath, embed: embed.Build());
+            embed = embed.WithImageUrl($"attachment://{pngPath}");
+            message = await channel.SendFileAsync(pngPath, embed: embed.Build());
         }
         else
         {

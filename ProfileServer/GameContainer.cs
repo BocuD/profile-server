@@ -233,7 +233,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 
                 //generate svg by running csvtosvg
                 string csvToSvgPath = Environment.GetEnvironmentVariable("CSVTOSVGPATH") ?? "";
-                string svgPath = "";
+                string pngPath = "";
                 if (!string.IsNullOrEmpty(csvToSvgPath))
                 {
                     Log.Information("Generating performance preview image...");
@@ -242,7 +242,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = csvToSvgPath,
-                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats *",
+                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats * -skipRows 4 -ignoreStats DynRes Percentile",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -263,15 +263,43 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     }
                     else
                     {
-                        svgPath = svgFile;
                         await DiscordBot.Instance.UpdateMessageContent(message,
                             "Performance SVG data collected: " + Path.GetFileName(svgFile));
+                        
+                        //convert to png
+                        pngPath = Path.ChangeExtension(svgFile, ".png");
+                        ProcessStartInfo pngStartInfo = new()
+                        {
+                            FileName = "magick",
+                            Arguments = $"{svgFile} {pngPath}",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        
+                        using Process pngProcess = new() { StartInfo = pngStartInfo };
+                        pngProcess.Start();
+                        string pngOutput = await pngProcess.StandardOutput.ReadToEndAsync();
+                        string pngError = await pngProcess.StandardError.ReadToEndAsync();
+                        await pngProcess.WaitForExitAsync();
+                        
+                        if (pngProcess.ExitCode != 0)
+                        {
+                            Log.Error("Error running magick: {Error}", pngError);
+                            await DiscordBot.Instance.UpdateMessageContent(message, "Error running magick: " + pngError);
+                        }
+                        else
+                        {
+                            await DiscordBot.Instance.UpdateMessageContent(message,
+                                "Performance preview image collected: " + Path.GetFileName(pngPath));
+                        }
                     }
                 }
                 
                 //send the results to discord
                 await DiscordBot.Instance.SendPerformanceReportEmbed(
-                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile, svgPath);
+                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile, pngPath);
             }
         }
     }
