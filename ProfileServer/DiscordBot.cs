@@ -409,15 +409,53 @@ public class DiscordBot
     public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile95, float percentile99,
         float maxFrameTime, string csvFile)
     {
-        Embed? embed = new EmbedBuilder()
-            .WithTitle("Performance Report")
-            .WithDescription("A new performance report was just generated.")
-            .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({(1000.0f / averageFrameTime):F2} FPS)", true)
-            .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({(1000.0f / percentile95):F2} FPS)", true)
-            .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({(1000.0f / percentile99):F2} FPS)", true)
-            .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({(1000.0f / maxFrameTime):F2})", true)
-            .WithColor(Color.Green)
-            .Build();
+        PerformanceReport? lastReport = await _dbContext.PerformanceReports
+            .OrderByDescending(x => x.created)
+            .FirstOrDefaultAsync();
+
+        Embed? embed;
+        if (lastReport != null)
+        {
+            float averageDeltaPercentage = (averageFrameTime - lastReport.averageFrametime) / lastReport.averageFrametime * 100.0f;
+            float percentile95DeltaPercentage = (percentile95 - lastReport.percentile95) / lastReport.percentile95 * 100.0f;
+            float percentile99DeltaPercentage = (percentile99 - lastReport.percentile99) / lastReport.percentile99 * 100.0f;
+            float maxDeltaPercentage = (maxFrameTime - lastReport.maxFrameTime) / lastReport.maxFrameTime * 100.0f;
+            
+            string FPS(float frametime) => $"{(1000.0f / frametime):F2} FPS";
+            string Delta(float percentage) => $"{(percentage > 0 ? "+" : "")}{percentage:F2}%";
+            
+            embed = new EmbedBuilder()
+                .WithTitle("Performance Report")
+                .WithDescription("A new performance report was just generated.")
+                .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({FPS(averageFrameTime)}) " +
+                    $"({lastReport.averageFrametime} ms {Delta(averageDeltaPercentage)})", true)
+                .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({FPS(percentile95)}) " +
+                    $"({lastReport.percentile95} ms {Delta(percentile95DeltaPercentage)})", true)
+                .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({FPS(percentile99)}) " +
+                    $"({lastReport.percentile99} ms {Delta(percentile99DeltaPercentage)})", true)
+                .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({FPS(maxFrameTime)}) " +
+                    $"({lastReport.maxFrameTime} ms {Delta(maxDeltaPercentage)})", true)
+                .AddField("Last report message link: ", $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})", true) 
+                .WithColor(Color.Green)
+                .Build();
+        }
+        else
+        {
+            embed = new EmbedBuilder()
+                .WithTitle("Performance Report")
+                .WithDescription("A new performance report was just generated.")
+                .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({(1000.0f / averageFrameTime):F2} FPS)",
+                    true)
+                .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({(1000.0f / percentile95):F2} FPS)",
+                    true)
+                .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({(1000.0f / percentile99):F2} FPS)",
+                    true)
+                .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({(1000.0f / maxFrameTime):F2})", true)
+                .WithColor(Color.Green)
+                .Build();
+        }
+
+        RestUserMessage? message = await channel.SendMessageAsync(embed: embed);
         
         //add to database
         PerformanceReport report = new()
@@ -427,12 +465,11 @@ public class DiscordBot
             averageFrametime = averageFrameTime,
             percentile95 = percentile95,
             percentile99 = percentile99,
-            maxFrameTime = maxFrameTime
+            maxFrameTime = maxFrameTime,
+            messageId = message.Id
         };
         
         _dbContext.PerformanceReports.Add(report);
         await _dbContext.SaveChangesAsync();
-
-        await channel.SendMessageAsync(embed: embed);
     }
 }

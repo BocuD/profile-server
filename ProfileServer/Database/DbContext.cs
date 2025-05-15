@@ -20,8 +20,10 @@ public class PerformanceReport
     
     public string csvName { get; set; } = "";
     
-    public float averageFrametime;
-    public float percentile95;
-    public float percentile99;
-    public float maxFrameTime;
+    public float averageFrametime { get; set; }
+    public float percentile95 { get; set; }
+    public float percentile99 { get; set; }
+    public float maxFrameTime { get; set; }
+    
+    public ulong messageId { get; set; }
 }
