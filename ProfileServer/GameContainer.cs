@@ -68,7 +68,6 @@ public class GameContainer(string workingDirectory, string executable, string ar
             await DiscordBot.Instance.UpdateMessageContent(message, "Collecting trace data...");
             Log.Information("Collecting trace data...");
             await GetTraceData(message);
-
             await GetPerformanceData(message, fullLogDirectory, subdirectories);
         });
 
@@ -111,44 +110,55 @@ public class GameContainer(string workingDirectory, string executable, string ar
 
                     await DiscordBot.Instance.UpdateMessageContent(message,
                         "Trace data collected: " + Path.GetFileName(trace));
+                    
+                    long fileSize = new FileInfo(output).Length;
 
-                    if (Environment.GetEnvironmentVariable("ENABLE_GIT") == "TRUE") 
+                    if (Environment.GetEnvironmentVariable("ENABLE_GIT") == "TRUE")
                     {
-                        //commit the new file to git
-                        string gitPath = Path.Combine(Environment.CurrentDirectory, "output");
-                        string gitExe = "\"C:\\Program Files\\Git\\bin\\git.exe\"";
-                        string gitCommand = $"& {gitExe} add {output} && & {gitExe} commit -m \"Trace data\" && & {gitExe} push";
-
-                        using (PowerShell powerShell = PowerShell.Create())
+                        //if bigger than 100MB, don't upload to git
+                        if (fileSize > 100 * 1024 * 1024)
                         {
-                            powerShell.AddScript($"cd {gitPath}");
-                            powerShell.AddScript(gitCommand);
-                            var results = powerShell.Invoke();
-                            
-                            if (powerShell.HadErrors)
+                            Log.Warning("Trace data is too large to upload to git: {FileSize}", PrettyBytes(fileSize));
+                            await DiscordBot.Instance.UpdateMessageContent(message,
+                                "Trace data is too large to upload to git: " + PrettyBytes(fileSize));
+                        }
+                        else
+                        {
+                            //commit the new file to git
+                            string gitPath = Path.Combine(Environment.CurrentDirectory, "output");
+                            string gitExe = "\"C:\\Program Files\\Git\\bin\\git.exe\"";
+                            string gitCommand =
+                                $"& {gitExe} add {output} && & {gitExe} commit -m \"Trace data\" && & {gitExe} push";
+
+                            using (PowerShell powerShell = PowerShell.Create())
                             {
-                                foreach (var error in powerShell.Streams.Error)
+                                powerShell.AddScript($"cd {gitPath}");
+                                powerShell.AddScript(gitCommand);
+                                var results = powerShell.Invoke();
+
+                                if (powerShell.HadErrors)
                                 {
-                                    //Git error: remote: warning: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com/.17:34:00Git error: To https://github.com/BUAS-Game1/PaletteCleanserProfileOutput.git
-                                    //remove large file detected urls
-                                    string filtered = error.ToString();
-                                    filtered = filtered.Replace("https://git-lfs.github.com/", "");
-                                    Log.Error("Git error: {Error}", filtered);
-                                    await DiscordBot.Instance.UpdateMessageContent(message, "Git error: " + error);
+                                    foreach (var error in powerShell.Streams.Error)
+                                    {
+                                        //Git error: remote: warning: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com/.17:34:00Git error: To https://github.com/BUAS-Game1/PaletteCleanserProfileOutput.git
+                                        //remove large file detected urls
+                                        string filtered = error.ToString();
+                                        filtered = filtered.Replace("https://git-lfs.github.com/", "");
+                                        Log.Error("Git error: {Error}", filtered);
+                                        await DiscordBot.Instance.UpdateMessageContent(message, "Git error: " + error);
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                Log.Information("Git command executed successfully");
-                                string commandOutput = string.Join(Environment.NewLine, results);
-                                Log.Information("Git command output: {Output}", commandOutput);
-                                await DiscordBot.Instance.UpdateMessageContent(message, $"Git: {commandOutput}");
+                                else
+                                {
+                                    Log.Information("Git command executed successfully");
+                                    string commandOutput = string.Join(Environment.NewLine, results);
+                                    Log.Information("Git command output: {Output}", commandOutput);
+                                    await DiscordBot.Instance.UpdateMessageContent(message, $"Git: {commandOutput}");
+                                }
                             }
                         }
                     }
 
-                    long fileSize = new FileInfo(output).Length;
-                    
                     Log.Information("Trace data collected: {Trace} ({fileSize})", Path.GetFileName(trace), PrettyBytes(fileSize));
                 }
             }
