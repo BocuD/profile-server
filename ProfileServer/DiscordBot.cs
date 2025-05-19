@@ -436,20 +436,20 @@ public class DiscordBot
             embed = new EmbedBuilder()
                 .WithTitle("Performance Report")
                 .WithDescription("A new performance report was just generated.")
-                .AddField("Game Thread", averageGameThreadTime + $"ms ({lastReport.averageGameThreadTime} **{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)\n", true)
-                .AddField("Render Thread", averageRenderThreadTime + $"ms ({lastReport.averageRenderThreadTime} **{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)\n", true)
-                .AddField("GPU", averageGpuTime + $"ms ({lastReport.averageGpuTime} **{Delta(lastReport.averageGpuTime, averageGpuTime)}**)\n", true)
+                .AddField("Game Thread", $"{averageGameThreadTime:F2} ms ({lastReport.averageGameThreadTime:F2} ms\n**{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)\n", true)
+                .AddField("Render Thread", $"{averageRenderThreadTime:F2} ms ({lastReport.averageRenderThreadTime:F2} ms\n**{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)\n", true)
+                .AddField("GPU", $"{averageGpuTime:F2} ms ({lastReport.averageGpuTime:F2} ms\n**{Delta(lastReport.averageGpuTime, averageGpuTime)}**)\n", true)
 
-                .AddField($"Average Frame Time", $"{FPS(averageFrameTime)} {averageFrameTime:F2} ms" +
+                .AddField($"Average Frame Time", $"{FPS(averageFrameTime)} {averageFrameTime:F2} ms\n" +
                                                  $"({FPS(lastReport.averageFrametime)} **{FPSDelta(averageFrameTime, lastReport.averageFrametime)}**)",
                     true)
-                .AddField($"95th Percentile Frame Time", $"{FPS(percentile95)} {percentile95:F2} ms" +
+                .AddField($"95th Percentile Frame Time", $"{FPS(percentile95)} {percentile95:F2} ms\n" +
                                                          $"({FPS(lastReport.percentile95)} **{FPSDelta(percentile95, lastReport.percentile95)}**)",
                     true)
-                .AddField($"99th Percentile Frame Time", $"{FPS(percentile99)} {percentile99:F2} ms" +
+                .AddField($"99th Percentile Frame Time", $"{FPS(percentile99)} {percentile99:F2} ms\n" +
                                                          $"({FPS(lastReport.percentile99)} **{FPSDelta(percentile99, lastReport.percentile99)}**)",
                     true)
-                .AddField($"Worst Frame Time", $"{FPS(maxFrameTime)} {maxFrameTime:F2} ms" +
+                .AddField($"Worst Frame Time", $"{FPS(maxFrameTime)} {maxFrameTime:F2} ms\n" +
                                                  $"({FPS(lastReport.maxFrameTime)} **{FPSDelta(maxFrameTime, lastReport.maxFrameTime)}**)",
                     true)
                 .AddField("Last report message link: ",
