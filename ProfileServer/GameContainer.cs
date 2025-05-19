@@ -209,12 +209,18 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 string[] headers = lines[0].Split(',');
                 
                 List<float> frameTimes = [];
+                List<float> gameThreadTimes = [];
+                List<float> renderThreadTimes = [];
+                List<float> gpuTimes = [];
                 
                 //parse the rest of the lines (skipping first 20 frames)
                 for (int i = 20; i < lines.Length; i++)
                 {
                     string[] values = lines[i].Split(',');
                     frameTimes.Add(float.Parse(values[1]));
+                    gameThreadTimes.Add(float.Parse(values[2]));
+                    renderThreadTimes.Add(float.Parse(values[3]));
+                    gpuTimes.Add(float.Parse(values[4]));
                 }
                 
                 //calculate the average frame time
@@ -230,6 +236,10 @@ public class GameContainer(string workingDirectory, string executable, string ar
 
                 //calculate maximum frame time
                 float maxFrameTime = frameTimes.Max();
+                
+                float averageGameThreadTime = gameThreadTimes.Average();
+                float averageRenderThreadTime = renderThreadTimes.Average();
+                float averageGpuTime = gpuTimes.Average();
                 
                 //generate svg by running csvtosvg
                 string csvToSvgPath = Environment.GetEnvironmentVariable("CSVTOSVGPATH") ?? "";
@@ -299,7 +309,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 
                 //send the results to discord
                 await DiscordBot.Instance.SendPerformanceReportEmbed(
-                    averageFrameTime, percentile95, percentile99, maxFrameTime, csvFile, pngPath);
+                    averageFrameTime, percentile95, percentile99, maxFrameTime, averageGameThreadTime, averageRenderThreadTime, averageGpuTime, csvFile, pngPath);
             }
         }
     }

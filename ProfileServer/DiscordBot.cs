@@ -410,7 +410,7 @@ public class DiscordBot
     }
     
     public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile95, float percentile99,
-        float maxFrameTime, string csvFile, string pngPath)
+        float maxFrameTime, float averageGameThreadTime, float averageRenderThreadTime, float averageGpuTime, string csvFile, string pngPath)
     {
         PerformanceReport? lastReport = await _dbContext.PerformanceReports
             .OrderByDescending(x => x.created)
@@ -419,28 +419,39 @@ public class DiscordBot
         EmbedBuilder? embed;
         if (lastReport != null)
         {
-            float averageDeltaPercentage = (averageFrameTime - lastReport.averageFrametime) / lastReport.averageFrametime * 100.0f;
-            float percentile95DeltaPercentage = (percentile95 - lastReport.percentile95) / lastReport.percentile95 * 100.0f;
-            float percentile99DeltaPercentage = (percentile99 - lastReport.percentile99) / lastReport.percentile99 * 100.0f;
-            float maxDeltaPercentage = (maxFrameTime - lastReport.maxFrameTime) / lastReport.maxFrameTime * 100.0f;
-            
             string FPS(float frametime) => $"{(1000.0f / frametime):F2} FPS";
-            string Delta(float percentage) => $"{(percentage > 0 ? "+" : "")}{percentage:F2}%";
+            string Delta(float oldFrametime, float newFrametime)
+            {
+                float delta = (newFrametime - oldFrametime) / oldFrametime * 100.0f;
+                return $"{(delta > 0 ? "+" : "")}{delta:F2}%";
+            }
+            string FPSDelta(float newFrametime, float oldFrametime)
+            {
+                float newFPS = 1000.0f / newFrametime;
+                float oldFPS = 1000.0f / oldFrametime;
+                float delta = (newFPS - oldFPS) / oldFPS * 100.0f;
+                return $"{(delta > 0 ? "+" : "")}{delta:F2}%";
+            }
 
             embed = new EmbedBuilder()
                 .WithTitle("Performance Report")
-                .WithDescription("A new performance report was just generated.")
+                .WithDescription("A new performance report was just generated.\n" +
+                                 "Game Thread: " + averageGameThreadTime + $"ms ({lastReport.averageGameThreadTime}, {Delta(lastReport.averageGameThreadTime, averageGameThreadTime)})\n" +
+                                "Render Thread: " + averageRenderThreadTime + $"ms ({lastReport.averageRenderThreadTime}, {Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)})\n" +
+                                "GPU: " + averageGpuTime + $"ms ({lastReport.averageGpuTime}, {Delta(lastReport.averageGpuTime, averageGpuTime)})\n" +
+                    true)
                 .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({FPS(averageFrameTime)}) " +
-                                                 $"({lastReport.averageFrametime} ms {Delta(averageDeltaPercentage)})",
+                                                 $"({FPS(lastReport.averageFrametime)} ({FPSDelta(averageFrameTime, lastReport.averageFrametime)})",
                     true)
                 .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({FPS(percentile95)}) " +
-                                                         $"({lastReport.percentile95} ms {Delta(percentile95DeltaPercentage)})",
+                                                         $"({FPS(lastReport.percentile95)} ({FPSDelta(percentile95, lastReport.percentile95)})",
                     true)
                 .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({FPS(percentile99)}) " +
-                                                         $"({lastReport.percentile99} ms {Delta(percentile99DeltaPercentage)})",
+                                                         $"({FPS(lastReport.percentile99)} ({FPSDelta(percentile99, lastReport.percentile99)})",
                     true)
                 .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({FPS(maxFrameTime)}) " +
-                                               $"({lastReport.maxFrameTime} ms {Delta(maxDeltaPercentage)})", true)
+                                                 $"({FPS(lastReport.maxFrameTime)} ({FPSDelta(maxFrameTime, lastReport.maxFrameTime)})",
+                    true)
                 .AddField("Last report message link: ",
                     $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
                     true)
@@ -482,7 +493,10 @@ public class DiscordBot
             percentile95 = percentile95,
             percentile99 = percentile99,
             maxFrameTime = maxFrameTime,
-            messageId = message.Id
+            messageId = message.Id,
+            averageGameThreadTime = averageGameThreadTime,
+            averageRenderThreadTime = averageRenderThreadTime,
+            averageGpuTime = averageGpuTime
         };
         
         _dbContext.PerformanceReports.Add(report);

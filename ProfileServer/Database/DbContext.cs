@@ -25,5 +25,9 @@ public class PerformanceReport
     public float percentile99 { get; set; }
     public float maxFrameTime { get; set; }
     
+    public float averageGameThreadTime { get; set; }
+    public float averageRenderThreadTime { get; set; }
+    public float averageGpuTime { get; set; }
+    
     public ulong messageId { get; set; }
 }
