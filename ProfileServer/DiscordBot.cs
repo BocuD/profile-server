@@ -435,22 +435,22 @@ public class DiscordBot
 
             embed = new EmbedBuilder()
                 .WithTitle("Performance Report")
-                .WithDescription("A new performance report was just generated.\n" +
-                                 "Game Thread: " + averageGameThreadTime + $"ms ({lastReport.averageGameThreadTime}, {Delta(lastReport.averageGameThreadTime, averageGameThreadTime)})\n" +
-                                "Render Thread: " + averageRenderThreadTime + $"ms ({lastReport.averageRenderThreadTime}, {Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)})\n" +
-                                "GPU: " + averageGpuTime + $"ms ({lastReport.averageGpuTime}, {Delta(lastReport.averageGpuTime, averageGpuTime)})\n" +
+                .WithDescription("A new performance report was just generated.")
+                .AddField("Game Thread", averageGameThreadTime + $"ms ({lastReport.averageGameThreadTime} **{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)\n", true)
+                .AddField("Render Thread", averageRenderThreadTime + $"ms ({lastReport.averageRenderThreadTime} **{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)\n", true)
+                .AddField("GPU", averageGpuTime + $"ms ({lastReport.averageGpuTime} **{Delta(lastReport.averageGpuTime, averageGpuTime)}**)\n", true)
+
+                .AddField($"Average Frame Time", $"{FPS(averageFrameTime)} {averageFrameTime:F2} ms" +
+                                                 $"({FPS(lastReport.averageFrametime)} **{FPSDelta(averageFrameTime, lastReport.averageFrametime)}**)",
                     true)
-                .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({FPS(averageFrameTime)}) " +
-                                                 $"({FPS(lastReport.averageFrametime)} ({FPSDelta(averageFrameTime, lastReport.averageFrametime)})",
+                .AddField($"95th Percentile Frame Time", $"{FPS(percentile95)} {percentile95:F2} ms" +
+                                                         $"({FPS(lastReport.percentile95)} **{FPSDelta(percentile95, lastReport.percentile95)}**)",
                     true)
-                .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({FPS(percentile95)}) " +
-                                                         $"({FPS(lastReport.percentile95)} ({FPSDelta(percentile95, lastReport.percentile95)})",
+                .AddField($"99th Percentile Frame Time", $"{FPS(percentile99)} {percentile99:F2} ms" +
+                                                         $"({FPS(lastReport.percentile99)} **{FPSDelta(percentile99, lastReport.percentile99)}**)",
                     true)
-                .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({FPS(percentile99)}) " +
-                                                         $"({FPS(lastReport.percentile99)} ({FPSDelta(percentile99, lastReport.percentile99)})",
-                    true)
-                .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({FPS(maxFrameTime)}) " +
-                                                 $"({FPS(lastReport.maxFrameTime)} ({FPSDelta(maxFrameTime, lastReport.maxFrameTime)})",
+                .AddField($"Worst Frame Time", $"{FPS(maxFrameTime)} {maxFrameTime:F2} ms" +
+                                                 $"({FPS(lastReport.maxFrameTime)} **{FPSDelta(maxFrameTime, lastReport.maxFrameTime)}**)",
                     true)
                 .AddField("Last report message link: ",
                     $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
