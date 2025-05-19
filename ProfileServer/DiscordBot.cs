@@ -436,9 +436,9 @@ public class DiscordBot
             embed = new EmbedBuilder()
                 .WithTitle("Performance Report")
                 .WithDescription("A new performance report was just generated.")
-                .AddField("Game Thread", $"{averageGameThreadTime:F2} ms ({lastReport.averageGameThreadTime:F2} ms\n**{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)\n", true)
-                .AddField("Render Thread", $"{averageRenderThreadTime:F2} ms ({lastReport.averageRenderThreadTime:F2} ms\n**{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)\n", true)
-                .AddField("GPU", $"{averageGpuTime:F2} ms ({lastReport.averageGpuTime:F2} ms\n**{Delta(lastReport.averageGpuTime, averageGpuTime)}**)\n", true)
+                .AddField("Game Thread", $"{averageGameThreadTime:F2} ms\n({lastReport.averageGameThreadTime:F2} ms **{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)", true)
+                .AddField("Render Thread", $"{averageRenderThreadTime:F2} ms\n({lastReport.averageRenderThreadTime:F2} ms **{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)", true)
+                .AddField("GPU", $"{averageGpuTime:F2} ms\n({lastReport.averageGpuTime:F2} ms **{Delta(lastReport.averageGpuTime, averageGpuTime)}**)", true)
 
                 .AddField($"Average Frame Time", $"{FPS(averageFrameTime)} {averageFrameTime:F2} ms\n" +
                                                  $"({FPS(lastReport.averageFrametime)} **{FPSDelta(averageFrameTime, lastReport.averageFrametime)}**)",
@@ -452,8 +452,8 @@ public class DiscordBot
                 .AddField($"Worst Frame Time", $"{FPS(maxFrameTime)} {maxFrameTime:F2} ms\n" +
                                                  $"({FPS(lastReport.maxFrameTime)} **{FPSDelta(maxFrameTime, lastReport.maxFrameTime)}**)",
                     true)
-                .AddField("Last report message link: ",
-                    $"[Click here](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
+                .AddField("Last report",
+                    $"[{lastReport.created}](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
                     true)
                 .WithColor(Color.Green);
         }
