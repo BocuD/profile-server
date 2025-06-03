@@ -270,7 +270,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = csvToSvgPath,
-                        Arguments = $"-csvs {csvFilePath} -o {svgFile} -stats * -ignoreStats Time DynRes Percentile",
+                        Arguments = $"-csvs {csvFilePath} -o {svgFile} -ignoreStats \"Time (sec)\" DynRes Percentile -stats *",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
