@@ -214,6 +214,14 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 {
                     lines = lines.Skip(4).ToArray();
                 }
+                
+                //remove line 1, 2, 3 and 4
+                lines = lines.Where((_, index) => index is 0 or > 10).ToArray();
+                
+                //write the modified lines to a new file
+                string csvFileName = Path.GetFileNameWithoutExtension(csvFile);
+                string csvFilePath = Path.Combine(directory, $"{csvFileName}_processed.csv");
+                await File.WriteAllLinesAsync(csvFilePath, lines);
 
                 //parse the first line
                 string[] headers = lines[0].Split(',');
@@ -262,7 +270,7 @@ public class GameContainer(string workingDirectory, string executable, string ar
                     ProcessStartInfo startInfo = new()
                     {
                         FileName = csvToSvgPath,
-                        Arguments = $"-csvs {csvFile} -o {svgFile} -stats * -skipRows 4 -ignoreStats DynRes Percentile",
+                        Arguments = $"-csvs {csvFilePath} -o {svgFile} -stats * -skipRows 4 -ignoreStats DynRes Percentile",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
