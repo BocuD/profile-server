@@ -277,6 +277,9 @@ public class GameContainer(string workingDirectory, string executable, string ar
                         CreateNoWindow = true
                     };
                     
+                    //log exe path and arguments
+                    Log.Information("Running csvtosvg: {Exe} {Args}", startInfo.FileName, startInfo.Arguments);
+                    
                     using Process process = new() { StartInfo = startInfo };
                     process.Start();
                     
