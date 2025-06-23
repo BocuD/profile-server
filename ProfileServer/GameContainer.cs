@@ -258,81 +258,88 @@ public class GameContainer(string workingDirectory, string executable, string ar
                 float averageGameThreadTime = gameThreadTimes.Average();
                 float averageRenderThreadTime = renderThreadTimes.Average();
                 float averageGpuTime = gpuTimes.Average();
-                
-                //generate svg by running csvtosvg
-                string csvToSvgPath = Environment.GetEnvironmentVariable("CSVTOSVGPATH") ?? "";
-                string pngPath = "";
-                if (!string.IsNullOrEmpty(csvToSvgPath))
-                {
-                    Log.Information("Generating performance preview image...");
-                    //run the tool
-                    string svgFile = Path.Combine(directory, "performance.svg");
-                    ProcessStartInfo startInfo = new()
-                    {
-                        FileName = csvToSvgPath,
-                        Arguments = $"-csvs {csvFilePath} -o {svgFile} -ignoreStats \"Time (sec)\" DynRes Percentile -stats *",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-                    
-                    //log exe path and arguments
-                    Log.Information("Running csvtosvg: {Exe} {Args}", startInfo.FileName, startInfo.Arguments);
-                    
-                    using Process process = new() { StartInfo = startInfo };
-                    process.Start();
-                    
-                    string output = await process.StandardOutput.ReadToEndAsync();
-                    string error = await process.StandardError.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-                    
-                    if (process.ExitCode != 0)
-                    {
-                        Log.Error("Error running csvtosvg: {Error}", error);
-                        await DiscordBot.Instance.UpdateMessageContent(message, "Error running csvtosvg: " + error);
-                    }
-                    else
-                    {
-                        await DiscordBot.Instance.UpdateMessageContent(message,
-                            "Performance SVG data collected: " + Path.GetFileName(svgFile));
-                        
-                        //convert to png
-                        pngPath = Path.ChangeExtension(svgFile, ".png");
-                        ProcessStartInfo pngStartInfo = new()
-                        {
-                            FileName = "magick",
-                            Arguments = $"{svgFile} {pngPath}",
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-                        
-                        using Process pngProcess = new() { StartInfo = pngStartInfo };
-                        pngProcess.Start();
-                        string pngOutput = await pngProcess.StandardOutput.ReadToEndAsync();
-                        string pngError = await pngProcess.StandardError.ReadToEndAsync();
-                        await pngProcess.WaitForExitAsync();
-                        
-                        if (pngProcess.ExitCode != 0)
-                        {
-                            Log.Error("Error running magick: {Error}", pngError);
-                            await DiscordBot.Instance.UpdateMessageContent(message, "Error running magick: " + pngError);
-                        }
-                        else
-                        {
-                            await DiscordBot.Instance.UpdateMessageContent(message,
-                                "Performance preview image collected: " + Path.GetFileName(pngPath));
-                        }
-                    }
-                }
+
+                string svgFile = Path.Combine(directory, "performance.svg");
+                string pngPath = await GeneratePNGFromCSV(csvFilePath, svgFile, message);
                 
                 //send the results to discord
                 await DiscordBot.Instance.SendPerformanceReportEmbed(
                     averageFrameTime, percentile95, percentile99, maxFrameTime, averageGameThreadTime, averageRenderThreadTime, averageGpuTime, csvFile, pngPath);
             }
         }
+    }
+
+    public static async Task<string> GeneratePNGFromCSV(string inputCsvName, string outputSvgName, ulong message)
+    {
+        //generate svg by running csvtosvg
+        string csvToSvgPath = Environment.GetEnvironmentVariable("CSVTOSVGPATH") ?? "";
+        string pngPath = "";
+        if (!string.IsNullOrEmpty(csvToSvgPath))
+        {
+            Log.Information("Generating performance preview image...");
+            //run the tool
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = csvToSvgPath,
+                Arguments = $"-csvs {inputCsvName} -o {outputSvgName} -ignoreStats \"Time (sec)\" DynRes Percentile -stats *",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            //log exe path and arguments
+            Log.Information("Running csvtosvg: {Exe} {Args}", startInfo.FileName, startInfo.Arguments);
+
+            using Process process = new() { StartInfo = startInfo };
+            process.Start();
+
+            string output = await process.StandardOutput.ReadToEndAsync();
+            string error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+            {
+                Log.Error("Error running csvtosvg: {Error}", error);
+                await DiscordBot.Instance.UpdateMessageContent(message, "Error running csvtosvg: " + error);
+            }
+            else
+            {
+                await DiscordBot.Instance.UpdateMessageContent(message,
+                    "Performance SVG data collected: " + Path.GetFileName(outputSvgName));
+
+                //convert to png
+                pngPath = Path.ChangeExtension(outputSvgName, ".png");
+                ProcessStartInfo pngStartInfo = new()
+                {
+                    FileName = "magick",
+                    Arguments = $"{outputSvgName} {pngPath}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using Process pngProcess = new() { StartInfo = pngStartInfo };
+                pngProcess.Start();
+                string pngOutput = await pngProcess.StandardOutput.ReadToEndAsync();
+                string pngError = await pngProcess.StandardError.ReadToEndAsync();
+                await pngProcess.WaitForExitAsync();
+
+                if (pngProcess.ExitCode != 0)
+                {
+                    Log.Error("Error running magick: {Error}", pngError);
+                    await DiscordBot.Instance.UpdateMessageContent(message, "Error running magick: " + pngError);
+                }
+                else
+                {
+                    await DiscordBot.Instance.UpdateMessageContent(message,
+                        "Performance preview image collected: " + Path.GetFileName(pngPath));
+                }
+            }
+        }
+
+        return pngPath;
     }
 
     private string PrettyBytes(long bytes)

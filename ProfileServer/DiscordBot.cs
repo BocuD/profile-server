@@ -127,6 +127,41 @@ public class DiscordBot
                     return false;
                 }
             });
+
+            await CreateGuildCommand("log-history", "Create a performance history report", async (c, m) =>
+            {
+                try
+                {
+                    var data = await _dbContext.PerformanceReports.OrderBy(x => x.created).ToListAsync();
+
+                    //create a csv with performance data
+                    var writer = new StringWriter();
+                    await writer.WriteLineAsync("date,fps,game,gpu,rt");
+                    foreach (var d in data)
+                    {
+                        await writer.WriteLineAsync(
+                            $"{d.averageFrametime},{d.averageGameThreadTime},{d.averageGpuTime},{d.averageRenderThreadTime}");
+                    }
+
+                    await writer.FlushAsync();
+
+                    //write to text
+                    string output = writer.ToString();
+                    await File.WriteAllTextAsync("report.csv", output);
+
+                    //upload to discord
+                    await SendFile("report.csv", "Created history report");
+
+                    string pngPath = await GameContainer.GeneratePNGFromCSV("report.csv", "report.png", m);
+                    await SendFile(pngPath, "Created graph");
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    await UpdateMessageContent(m, $"Failed to create history data: {e.Message}, {e.StackTrace}");
+                    return false;
+                }
+            });
             
             // await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
             // {
