@@ -166,6 +166,12 @@ public class DiscordBot
                     await UpdateMessageContent(m, $"Failed to create history data: {e.Message}, {e.StackTrace}");
                     return false;
                 }
+                //clean up the files
+                finally
+                {
+                    File.Delete("report.csv");
+                    File.Delete("report.png");
+                }
             });
             
             // await CreateGuildCommand("run-steam-command", "Run a command in SteamCMD", async (c, m) =>
