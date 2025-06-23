@@ -136,14 +136,15 @@ public class DiscordBot
 
                     //create a csv with performance data
                     var writer = new StringWriter();
-                    await writer.WriteLineAsync("date,fps,game,gpu,rt");
+                    await writer.WriteLineAsync("fps,frametime,game,gpu,rt");
                     float lastFrameTime = 1000000;
                     foreach (var d in data)
                     {
                         if (d.averageFrametime < lastFrameTime)
                         {
+                            float fps = 1000 / d.averageFrametime;
                             await writer.WriteLineAsync(
-                                $"{d.averageFrametime},{d.averageGameThreadTime},{d.averageGpuTime},{d.averageRenderThreadTime}");
+                                $"{fps},{d.averageFrametime},{d.averageGameThreadTime},{d.averageGpuTime},{d.averageRenderThreadTime}");
                             lastFrameTime = d.averageFrametime;
                         }
                     }
