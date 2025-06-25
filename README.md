@@ -40,9 +40,17 @@ git commit -m "Trace data"
 git push
 ```
 
+### Game Requirements
+Your game should have some way to use launch arguments to make it run a predefined benchmark, such as a camera flythrough of a level with scripted actions. It should also run two console commands (both at the start and end of the scripted session)
+
+At start of session: `StartFPSChart`
+At the end of the session: `StopFPSChart`
+
+The results of those will be used to analyze the game performance and draw an FPS chart over time, as well as gathering other data which will be stored in the database.
+
 ### Database
 Report data will be stored in an SQLite database stored at `(workingdirectory)/performance.db3`.
-Each new profiling session will automatically show performance deltas compared to the previous session, and link back to it. A full history report can be generated with `/log-history`.
+Each new profiling session will automatically show performance deltas compared to the previous session and link back to it. A full history report can be generated with `/log-history`.
 
 ![image](https://github.com/user-attachments/assets/8ecd8b8d-4f14-4bed-a612-8b2c7cad8c32)
 
