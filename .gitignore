@@ -399,3 +399,4 @@ FodyWeavers.xsd
 ProfileServer/steamcmd/*
 ProfileServer/.env
 /ProfileServer/output
+ProfileServer/performance.db3

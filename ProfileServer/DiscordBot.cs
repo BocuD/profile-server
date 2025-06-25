@@ -3,7 +3,9 @@ using Discord;
 using Discord.Net;
 using Discord.Rest;
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using ProfileServer.Database;
 using Serilog;
 
 namespace ProfileServer;
@@ -40,9 +42,14 @@ public class DiscordBot
     private readonly string gameArgs = Environment.GetEnvironmentVariable("GAMEARGS") ?? 
                                        throw new ArgumentNullException("GAMEARGS environment variable not set.");
     
+    private readonly string gameFolder = Environment.GetEnvironmentVariable("GAMEFOLDER") ?? 
+                                         throw new ArgumentNullException("GAMEFOLDER environment variable not set.");
+    
     private readonly string unrealInsightsPath = Environment.GetEnvironmentVariable("UNREALINSIGHTSPATH") ??
                                 throw new ArgumentNullException("UNREALINSIGHTSPATH environment variable not set.");
 
+    private static PerformanceDbContext _dbContext = new();
+    
     public DiscordBot()
     {
         Instance = this;
@@ -68,6 +75,8 @@ public class DiscordBot
     
     public async Task Init()
     {
+        await _dbContext.Database.MigrateAsync();
+        
         VerifyUnrealInsights();
         
         client.Log += msg =>
@@ -100,7 +109,7 @@ public class DiscordBot
                 }
 
                 VerifyUnrealInsights();
-                gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs);
+                gameContainer = new GameContainer(Environment.CurrentDirectory + "/steamcmd/game/", gameExecutable, gameArgs, gameFolder);
                 return await gameContainer.Run(m);
             });
             
@@ -116,6 +125,53 @@ public class DiscordBot
                 {
                     await UpdateMessageContent(m, "No game running.");
                     return false;
+                }
+            });
+
+            await CreateGuildCommand("log-history", "Create a performance history report", async (c, m) =>
+            {
+                try
+                {
+                    var data = await _dbContext.PerformanceReports.OrderBy(x => x.created).ToListAsync();
+
+                    //create a csv with performance data
+                    var writer = new StringWriter();
+                    await writer.WriteLineAsync("fps,frametime,game,gpu,rt");
+                    float lastFrameTime = 1000000;
+                    foreach (var d in data)
+                    {
+                        if (d.averageFrametime < lastFrameTime)
+                        {
+                            float fps = 1000 / d.averageFrametime;
+                            await writer.WriteLineAsync(
+                                $"{fps},{d.averageFrametime},{d.averageGameThreadTime},{d.averageGpuTime},{d.averageRenderThreadTime}");
+                            lastFrameTime = d.averageFrametime;
+                        }
+                    }
+
+                    await writer.FlushAsync();
+
+                    //write to text
+                    string output = writer.ToString();
+                    await File.WriteAllTextAsync("report.csv", output);
+
+                    //upload to discord
+                    await SendFile("report.csv", "Created history report");
+
+                    string pngPath = await GameContainer.GeneratePNGFromCSV("report.csv", "report.png", m);
+                    await SendFile(pngPath, "Created graph");
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    await UpdateMessageContent(m, $"Failed to create history data: {e.Message}, {e.StackTrace}");
+                    return false;
+                }
+                //clean up the files
+                finally
+                {
+                    File.Delete("report.csv");
+                    File.Delete("report.png");
                 }
             });
             
@@ -398,5 +454,99 @@ public class DiscordBot
         {
             Log.Error("Failed to send file: " + e.Message);
         }
+    }
+    
+    public async Task SendPerformanceReportEmbed(float averageFrameTime, float percentile95, float percentile99,
+        float maxFrameTime, float averageGameThreadTime, float averageRenderThreadTime, float averageGpuTime, string csvFile, string pngPath)
+    {
+        PerformanceReport? lastReport = await _dbContext.PerformanceReports
+            .OrderByDescending(x => x.created)
+            .FirstOrDefaultAsync();
+
+        EmbedBuilder? embed;
+        if (lastReport != null)
+        {
+            string FPS(float frametime) => $"{(1000.0f / frametime):F2} FPS";
+            string Delta(float oldFrametime, float newFrametime)
+            {
+                float delta = (newFrametime - oldFrametime) / oldFrametime * 100.0f;
+                return $"{(delta > 0 ? "+" : "")}{delta:F2}%";
+            }
+            string FPSDelta(float newFrametime, float oldFrametime)
+            {
+                float newFPS = 1000.0f / newFrametime;
+                float oldFPS = 1000.0f / oldFrametime;
+                float delta = (newFPS - oldFPS) / oldFPS * 100.0f;
+                return $"{(delta > 0 ? "+" : "")}{delta:F2}%";
+            }
+
+            embed = new EmbedBuilder()
+                .WithTitle("Performance Report")
+                .WithDescription("A new performance report was just generated.")
+                .AddField("Game Thread", $"{averageGameThreadTime:F2} ms\n({lastReport.averageGameThreadTime:F2} ms **{Delta(lastReport.averageGameThreadTime, averageGameThreadTime)}**)", true)
+                .AddField("Render Thread", $"{averageRenderThreadTime:F2} ms\n({lastReport.averageRenderThreadTime:F2} ms **{Delta(lastReport.averageRenderThreadTime, averageRenderThreadTime)}**)", true)
+                .AddField("GPU", $"{averageGpuTime:F2} ms\n({lastReport.averageGpuTime:F2} ms **{Delta(lastReport.averageGpuTime, averageGpuTime)}**)", true)
+
+                .AddField($"Average Frame Time", $"{FPS(averageFrameTime)} {averageFrameTime:F2} ms\n" +
+                                                 $"({FPS(lastReport.averageFrametime)} **{FPSDelta(averageFrameTime, lastReport.averageFrametime)}**)",
+                    true)
+                .AddField($"95th Percentile Frame Time", $"{FPS(percentile95)} {percentile95:F2} ms\n" +
+                                                         $"({FPS(lastReport.percentile95)} **{FPSDelta(percentile95, lastReport.percentile95)}**)",
+                    true)
+                .AddField($"99th Percentile Frame Time", $"{FPS(percentile99)} {percentile99:F2} ms\n" +
+                                                         $"({FPS(lastReport.percentile99)} **{FPSDelta(percentile99, lastReport.percentile99)}**)",
+                    true)
+                .AddField($"Worst Frame Time", $"{FPS(maxFrameTime)} {maxFrameTime:F2} ms\n" +
+                                                 $"({FPS(lastReport.maxFrameTime)} **{FPSDelta(maxFrameTime, lastReport.maxFrameTime)}**)",
+                    true)
+                .AddField("Last report",
+                    $"[{lastReport.created}](https://discord.com/channels/{channel.Guild.Id}/{channel.Id}/{lastReport.messageId})",
+                    true)
+                .WithColor(Color.Green);
+        }
+        else
+        {
+            embed = new EmbedBuilder()
+                .WithTitle("Performance Report")
+                .WithDescription("A new performance report was just generated.")
+                .AddField($"Average Frame Time", $"{averageFrameTime:F2} ms ({(1000.0f / averageFrameTime):F2} FPS)",
+                    true)
+                .AddField($"95th Percentile Frame Time", $"{percentile95:F2} ms ({(1000.0f / percentile95):F2} FPS)",
+                    true)
+                .AddField($"99th Percentile Frame Time", $"{percentile99:F2} ms ({(1000.0f / percentile99):F2} FPS)",
+                    true)
+                .AddField($"Worst Frame Time", $"{maxFrameTime:F2} ms ({(1000.0f / maxFrameTime):F2})", true)
+                .WithColor(Color.Green);
+        }
+
+        RestUserMessage? message;
+
+        if (!string.IsNullOrWhiteSpace(pngPath))
+        {
+            embed = embed.WithImageUrl($"attachment://{pngPath}");
+            message = await channel.SendFileAsync(pngPath, embed: embed.Build());
+        }
+        else
+        {
+            message = await channel.SendMessageAsync(embed: embed.Build());
+        }
+
+        //add to database
+        PerformanceReport report = new()
+        {
+            created = DateTime.UtcNow,
+            csvName = csvFile,
+            averageFrametime = averageFrameTime,
+            percentile95 = percentile95,
+            percentile99 = percentile99,
+            maxFrameTime = maxFrameTime,
+            messageId = message.Id,
+            averageGameThreadTime = averageGameThreadTime,
+            averageRenderThreadTime = averageRenderThreadTime,
+            averageGpuTime = averageGpuTime
+        };
+        
+        _dbContext.PerformanceReports.Add(report);
+        await _dbContext.SaveChangesAsync();
     }
 }
