@@ -62,7 +62,10 @@ Launch parameters for the game should be set so that your Unreal game automatica
 
 Commands:
 
-/update-game - update the game configured in environment
-/run-game - launch the game with specified launch parameters
-/stop-game - force close any running game processes launched by the profile server
-/log-history - create a graph showing profiling data over time (containing data stored in the database)
+`/update-game` - update the game configured in environment
+
+`/run-game` - launch the game with specified launch parameters
+
+`/stop-game` - force close any running game processes launched by the profile server
+
+`/log-history` - create a graph showing profiling data over time (containing data stored in the database)
