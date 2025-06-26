@@ -30,9 +30,10 @@ UNREALINSIGHTSPATH=    (probably something like "C:\Program Files\Epic Games\UE_
 CSVTOSVGPATH=          (probably something like "C:\Program Files\Epic Games\UE_5.4\Engine\Binaries\DotNET\CSVTools\CSVToSVG.exe" - without quotes) 
 ENABLE_GIT=           Set to TRUE to upload unreal insights trace files to a git repo.
 ```
+
 ### Git
 Notes about GIT repository uploads:
-Trace files will be copied to the "output" directory inside the working directory, and this directory will be treated as a git repo (git commands will be ran relative to this directory, so if you want to use it, make sure to initialize a git repository inside this directory)
+Trace files will be copied to the "output" directory inside the working directory, and this directory will be treated as a git repo (git commands will be run relative to this directory, so if you want to use it, make sure to initialize a git repository inside this directory)
 Git commands that will be used:
 ```sh
 git add {file}
@@ -40,13 +41,16 @@ git commit -m "Trace data"
 git push
 ```
 
+### Steam
+This tool is designed to work with `steamcmd` and pulls the latest version of a specific branch of your game from Steam whenever `update-game` is run. This is currently the only supported updating mechanism, but in the future other methods may be added. The current way to set this up is by adding your steam credentials to environment variables. Whenever the profiling server is launched, `steamcmd` will be launched and authenticated, likely triggering a 2FA prompt. The Discord frontend supports both modal-based 2FA OTP entry and Steam Guard app-based authentication. 
+
 ### Game Requirements
 Your game should have some way to use launch arguments to make it run a predefined benchmark, such as a camera flythrough of a level with scripted actions. It should also run two console commands (both at the start and end of the scripted session)
 
 At start of session: `StartFPSChart`
 At the end of the session: `StopFPSChart`
 
-The results of those will be used to analyze the game performance and draw an FPS chart over time, as well as gathering other data which will be stored in the database.
+The results of these will be used to analyze game performance and create an FPS chart over time, as well as gather other data, which will be stored in the database.
 
 ### Database
 Report data will be stored in an SQLite database stored at `(workingdirectory)/performance.db3`.
